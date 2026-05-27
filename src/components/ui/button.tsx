@@ -1,36 +1,57 @@
-"use client";
-import { type ButtonHTMLAttributes, forwardRef } from "react";
+import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
+import { Loader2 } from "lucide-react";
+import { forwardRef } from "react";
 
-export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "secondary" | "ghost" | "danger";
-  size?: "sm" | "md" | "lg";
+const buttonVariants = cva(
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary disabled:pointer-events-none disabled:opacity-50",
+  {
+    variants: {
+      variant: {
+        primary:
+          "bg-accent-primary text-white hover:bg-accent-primary/90 active:scale-[0.98]",
+        secondary:
+          "bg-bg-secondary text-text-primary border border-border hover:bg-bg-secondary/80 active:scale-[0.98]",
+        ghost:
+          "hover:bg-bg-secondary active:scale-[0.98]",
+        danger:
+          "bg-error text-white hover:bg-error/90 active:scale-[0.98]",
+      },
+      size: {
+        sm: "h-8 px-3 text-xs",
+        md: "h-10 px-4",
+        lg: "h-12 px-6 text-base",
+        icon: "h-10 w-10",
+      },
+    },
+    defaultVariants: {
+      variant: "primary",
+      size: "md",
+    },
+  }
+);
+
+export interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof buttonVariants> {
+  loading?: boolean;
 }
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = "primary", size = "md", ...props }, ref) => {
+  ({ className, variant, size, loading, children, disabled, ...props }, ref) => {
     return (
       <button
         ref={ref}
-        className={cn(
-          "inline-flex items-center justify-center font-medium transition-all duration-200 rounded focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed",
-          {
-            "bg-accent-primary text-white hover:bg-orange-600 active:bg-orange-700": variant === "primary",
-            "bg-white text-accent-primary border border-accent-primary hover:bg-orange-50": variant === "secondary",
-            "text-accent-primary hover:underline bg-transparent border-none": variant === "ghost",
-            "bg-error text-white hover:bg-red-600": variant === "danger",
-          },
-          {
-            "h-8 px-3 text-sm": size === "sm",
-            "h-11 px-5 text-base": size === "md",
-            "h-12 px-6 text-base": size === "lg",
-          },
-          className
-        )}
+        disabled={disabled || loading}
         {...props}
-      />
+        className={cn(buttonVariants({ variant, size }), className)}
+      >
+        {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+        {children}
+      </button>
     );
   }
 );
 Button.displayName = "Button";
-export { Button };
+
+export { Button, buttonVariants };

@@ -64,12 +64,11 @@ export default function SurveysPage() {
                     ))}
                   </div>
                 </div>
-                <Input
-                  as="textarea"
+                <textarea
                   placeholder="Share your thoughts (optional)"
                   value={feedback}
                   onChange={(e: any) => setFeedback(e.target.value)}
-                  className="min-h-24 resize-none"
+                  className="flex min-h-24 w-full rounded-lg border border-border bg-bg-primary px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-primary resize-none"
                 />
                 <Button
                   onClick={() => handleSubmit(survey.id)}
