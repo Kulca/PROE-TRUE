@@ -1,137 +1,186 @@
 "use client";
-import { useState } from "react";
-import { Search, SlidersHorizontal } from "lucide-react";
+
+import * as React from "react";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Search, Filter, MapPin, Package } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
-import { CATEGORIES, SA_PROVINCES } from "@/lib/utils";
-
-// Mock data
-const CAMPAIGNS = [
-  { id: "1", title: "Rooibos Ice Tea Sampler", description: "3-pack of refreshing iced rooibos teas. New flavour launch!", category: "new_launch", inventory: 142, brand: "Cape Brew Co." },
-  { id: "2", title: "Biltong Spice Mix Clearance", description: "Finish off the batch. Make your own biltong at home.", category: "clearance", inventory: 28, brand: "Safari Spices" },
-  { id: "3", title: "Winter Beanie - Odd Size", description: "One size left. Slightly irregular stitching on rim.", category: "odd_sizing", inventory: 15, brand: "JHB Knitwear" },
-  { id: "4", title: "Mango Chutney Sample Pack", description: "Out of season clearout. Sweet & tangy mango chutney.", category: "out_of_season", inventory: 67, brand: "Durban Flavours" },
-  { id: "5", title: "Beaded Bracelet Set", description: "Closing down inventory. Beautiful handcrafted bracelets.", category: "closing_down", inventory: 8, brand: " township Artisans" },
-  { id: "6", title: "Chai Latte Blend", description: "New launch! Authentic Indian chai spice blend.", category: "new_launch", inventory: 203, brand: "Spice Route Co." },
-];
-
-const categoryColors: Record<string, "accent" | "secondary" | "warning" | "error"> = {
-  new_launch: "accent",
-  clearance: "warning",
-  out_of_season: "secondary",
-  odd_sizing: "error",
-  closing_down: "error",
-};
+import { useToast } from "@/components/ui/toast";
 
 export default function MarketplacePage() {
-  const [search, setSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [selectedProvince, setSelectedProvince] = useState<string | null>(null);
-  const [selectedCampaign, setSelectedCampaign] = useState<typeof CAMPAIGNS[0] | null>(null);
-  const [showClaimModal, setShowClaimModal] = useState(false);
+  const { toast } = useToast();
+  const [selectedCampaign, setSelectedCampaign] = React.useState<any>(null);
+  const [isClaiming, setIsClaiming] = React.useState(false);
 
-  const filtered = CAMPAIGNS.filter((c) => {
-    if (search && !c.title.toLowerCase().includes(search.toLowerCase())) return false;
-    if (selectedCategory && c.category !== selectedCategory) return false;
-    return true;
-  });
+  const campaigns = [
+    {
+      id: "1",
+      title: "Summer Skincare Trial Kit",
+      brand: "Glow Beauty",
+      category: "New Launch",
+      size: "XS",
+      province: "Gauteng",
+      description: "Experience our new 3-step skincare routine for a glowing summer skin. Includes cleanser, toner, and moisturizer.",
+      image: "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=800&auto=format&fit=crop&q=60",
+    },
+    {
+      id: "2",
+      title: "Organic Almond Energy Bar",
+      brand: "Pure Bites",
+      category: "Clearance",
+      size: "S",
+      province: "Western Cape",
+      description: "A perfect snack for your morning hikes. Made with 100% organic almonds and honey.",
+      image: "https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?w=800&auto=format&fit=crop&q=60",
+    },
+    {
+      id: "3",
+      title: "Premium Arabica Coffee Pods",
+      brand: "Roast Master",
+      category: "Out of Season",
+      size: "M",
+      province: "KwaZulu-Natal",
+      description: "Taste the rich flavors of our limited edition winter roast. Compatible with all Nespresso machines.",
+      image: "https://images.unsplash.com/photo-1559056199-641a0ac8b55e?w=800&auto=format&fit=crop&q=60",
+    },
+    {
+      id: "4",
+      title: "Bamboo Fiber Kitchen Towels",
+      brand: "EcoHome",
+      category: "Odd Sizing",
+      size: "L",
+      province: "Eastern Cape",
+      description: "Highly absorbent and sustainable kitchen towels made from natural bamboo fibers.",
+      image: "https://images.unsplash.com/photo-1610348725531-843dff563e2c?w=800&auto=format&fit=crop&q=60",
+    },
+  ];
+
+  const handleClaim = () => {
+    setIsClaiming(true);
+    setTimeout(() => {
+      setIsClaiming(false);
+      setSelectedCampaign(null);
+      toast("success", "Sample claimed successfully! Check 'My Claims' for details.");
+    }, 1500);
+  };
 
   return (
-    <main className="p-6 max-w-6xl mx-auto">
-      <div className="mb-8">
-        <h1 className="font-serif text-4xl mb-2">Discover Freebies</h1>
-        <p className="text-text-secondary">Find free samples from South African brands near you.</p>
+    <div className="space-y-8 animate-page">
+      <div className="flex flex-col gap-1">
+        <h1 className="text-3xl font-serif text-text-primary">Freebie Marketplace</h1>
+        <p className="text-text-secondary">Discover and claim free samples from your favorite brands.</p>
       </div>
 
-      {/* Search & Filters */}
-      <div className="flex flex-col md:flex-row gap-4 mb-8">
+      <div className="flex flex-col md:flex-row gap-4">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
-          <Input
-            placeholder="Search campaigns..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-10"
-          />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
+          <Input placeholder="Search freebies..." className="pl-10" />
         </div>
-        <div className="flex gap-2 flex-wrap">
-          <Button
-            variant={selectedCategory === null ? "primary" : "secondary"}
-            size="sm"
-            onClick={() => setSelectedCategory(null)}
-          >
-            All
+        <div className="flex gap-2">
+          <Button variant="secondary" size="md">
+            <Filter className="mr-2 h-4 w-4" /> Category
           </Button>
-          {Object.entries(CATEGORIES).map(([key, label]) => (
-            <Button
-              key={key}
-              variant={selectedCategory === key ? "primary" : "secondary"}
-              size="sm"
-              onClick={() => setSelectedCategory(selectedCategory === key ? null : key)}
-            >
-              {label}
-            </Button>
-          ))}
+          <Button variant="secondary" size="md">
+            <MapPin className="mr-2 h-4 w-4" /> Province
+          </Button>
         </div>
       </div>
 
-      {/* Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filtered.map((campaign) => (
-          <Card key={campaign.id} hover className="overflow-hidden">
-            <div className="bg-bg-secondary h-40 flex items-center justify-center">
-              <span className="text-text-muted text-sm">{campaign.brand}</span>
-            </div>
-            <div className="p-4">
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <h3 className="font-serif text-lg leading-tight">{campaign.title}</h3>
-                <Badge variant={categoryColors[campaign.category]}>
-                  {CATEGORIES[campaign.category as keyof typeof CATEGORIES]}
-                </Badge>
-              </div>
-              <p className="text-sm text-text-secondary mb-4 line-clamp-2">{campaign.description}</p>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-text-muted">{campaign.inventory} left</span>
-                <Button size="sm" onClick={() => { setSelectedCampaign(campaign); setShowClaimModal(true); }}>
-                  Claim Freebie
-                </Button>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {campaigns.map((campaign) => (
+          <Card key={campaign.id} className="group cursor-pointer overflow-hidden flex flex-col h-full" onClick={() => setSelectedCampaign(campaign)}>
+            <div className="aspect-[3/2] overflow-hidden bg-bg-secondary relative">
+              <img 
+                src={campaign.image} 
+                alt={campaign.title} 
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+              />
+              <div className="absolute top-3 left-3 flex gap-2">
+                <Badge variant="accent">{campaign.category}</Badge>
               </div>
             </div>
+            <CardContent className="p-4 flex-1">
+              <div className="flex flex-col gap-1">
+                <p className="text-xs font-medium text-accent-secondary uppercase tracking-wider">{campaign.brand}</p>
+                <h3 className="text-lg font-serif text-text-primary leading-tight line-clamp-2">{campaign.title}</h3>
+              </div>
+              <div className="flex items-center gap-4 mt-4">
+                <div className="flex items-center gap-1.5 text-xs text-text-muted">
+                  <Package className="h-3.5 w-3.5" />
+                  <span>Size {campaign.size}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs text-text-muted">
+                  <MapPin className="h-3.5 w-3.5" />
+                  <span>{campaign.province}</span>
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter className="p-4 pt-0">
+              <Button variant="primary" className="w-full" onClick={(e) => {
+                e.stopPropagation();
+                setSelectedCampaign(campaign);
+              }}>
+                View Details
+              </Button>
+            </CardFooter>
           </Card>
         ))}
       </div>
 
-      {filtered.length === 0 && (
-        <div className="text-center py-20">
-          <p className="text-text-muted">No campaigns found matching your filters.</p>
-        </div>
-      )}
-
       {/* Claim Modal */}
-      <Modal isOpen={showClaimModal} onClose={() => setShowClaimModal(false)} title="Claim Your Freebie">
+      <Modal 
+        isOpen={!!selectedCampaign} 
+        onClose={() => setSelectedCampaign(null)}
+        title="Claim Sample"
+      >
         {selectedCampaign && (
-          <div className="space-y-4">
-            <div className="p-3 bg-bg-secondary rounded">
-              <p className="font-medium">{selectedCampaign.title}</p>
-              <p className="text-sm text-text-secondary">{selectedCampaign.brand}</p>
+          <div className="space-y-6">
+            <div className="flex gap-4">
+              <div className="w-24 h-24 rounded-card overflow-hidden shrink-0">
+                <img src={selectedCampaign.image} alt="" className="w-full h-full object-cover" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="font-serif text-lg leading-tight">{selectedCampaign.title}</h4>
+                <p className="text-sm text-text-muted mt-1">{selectedCampaign.brand}</p>
+                <div className="flex gap-2 mt-2">
+                  <Badge variant="secondary">{selectedCampaign.category}</Badge>
+                  <Badge variant="outline">{selectedCampaign.size}</Badge>
+                </div>
+              </div>
             </div>
+
             <div className="space-y-2">
-              <p className="text-sm font-medium">Collection Point</p>
-              <p className="text-sm text-text-secondary">PUDO Locker — Sandton City, Gauteng</p>
+              <p className="text-sm font-medium text-text-primary">About this sample</p>
+              <p className="text-sm text-text-secondary leading-relaxed">{selectedCampaign.description}</p>
             </div>
-            <div className="p-3 bg-warning/10 border border-warning/20 rounded text-sm">
-              <strong>Survey commitment:</strong> By claiming, you agree to complete a brief 5-star survey after collection to unlock future claims.
+
+            <div className="p-4 rounded-card bg-bg-secondary border border-border space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Pickup Location</span>
+                <span className="text-xs text-accent-primary font-medium">Change</span>
+              </div>
+              <div className="flex items-start gap-3 text-text-secondary">
+                <MapPin className="h-4 w-4 mt-0.5 text-accent-primary" />
+                <div className="text-xs">
+                  <p className="font-medium text-text-primary">PUDO Locker: Rosebank Mall</p>
+                  <p>15A Cradock Ave, Rosebank, Johannesburg, 2196</p>
+                </div>
+              </div>
             </div>
-            <div className="flex gap-3 pt-2">
-              <Button variant="secondary" onClick={() => setShowClaimModal(false)} className="flex-1">Cancel</Button>
-              <Button onClick={() => { setShowClaimModal(false); }} className="flex-1">Confirm Claim</Button>
+
+            <div className="space-y-3">
+              <p className="text-[10px] text-text-muted italic">
+                By claiming this sample, you agree to complete a short survey within 48 hours of collection. Subsequent claims will be locked until the survey is submitted.
+              </p>
+              <Button className="w-full" size="lg" onClick={handleClaim} isLoading={isClaiming}>
+                Confirm Claim
+              </Button>
             </div>
           </div>
         )}
       </Modal>
-    </main>
+    </div>
   );
 }

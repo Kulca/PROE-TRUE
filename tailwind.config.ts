@@ -2,9 +2,9 @@ import type { Config } from "tailwindcss";
 
 const config: Config = {
   content: [
-    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
+    "./components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
     extend: {
@@ -29,27 +29,36 @@ const config: Config = {
         border: "#E8E6E1",
       },
       fontFamily: {
-        serif: ["DM Serif Display", "serif"],
-        sans: ["Inter", "sans-serif"],
-        mono: ["JetBrains Mono", "monospace"],
+        serif: ["var(--font-dm-serif-display)"],
+        sans: ["var(--font-inter)"],
+        mono: ["var(--font-jetbrains-mono)"],
       },
       borderRadius: {
-        sm: "4px",
-        DEFAULT: "8px",
-        lg: "16px",
-        full: "9999px",
+        subtle: "4px",
+        card: "8px",
+        modal: "16px",
       },
       boxShadow: {
         card: "0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.06)",
-        "card-hover": "0 2px 8px rgba(0,0,0,0.08), 0 8px 24px rgba(0,0,0,0.10)",
+        "card-hover": "0 2px 8px rgba(0,0,0,0.08), 0 8px 24px rgba(0,0,0,0.12)",
       },
-      transitionDuration: {
-        DEFAULT: "200ms",
-        reveal: "300ms",
-        page: "400ms",
+      animation: {
+        reveal: "reveal 300ms ease-out",
+        page: "page 400ms ease-out",
+      },
+      keyframes: {
+        reveal: {
+          "0%": { opacity: "0", transform: "scale(0.95)" },
+          "100%": { opacity: "1", transform: "scale(1)" },
+        },
+        page: {
+          "0%": { opacity: "0", transform: "translateY(10px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
       },
     },
   },
   plugins: [],
 };
 export default config;
+// frontend

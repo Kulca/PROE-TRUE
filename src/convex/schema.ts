@@ -11,6 +11,34 @@ export default defineSchema({
     preferred_pudo_locker_id: v.optional(v.string()),
     pudo_locker_address: v.optional(v.string()),
     size_preferences: v.optional(v.array(v.string())),
+    category_interests: v.optional(v.array(v.string())),
+    notification_settings: v.optional(v.object({
+      email: v.boolean(),
+      sms: v.boolean(),
+      push: v.boolean(),
+    })),
+    onboardingStep: v.optional(v.number()),
+    brand_details: v.optional(v.object({
+      company_name: v.string(),
+      logo_url: v.optional(v.string()),
+      description: v.string(),
+      industry: v.string(),
+      social_links: v.optional(v.object({
+        instagram: v.optional(v.string()),
+        facebook: v.optional(v.string()),
+        twitter: v.optional(v.string()),
+      })),
+    })),
+    verification_docs: v.optional(v.object({
+      company_reg: v.optional(v.string()),
+      tax_clearance: v.optional(v.string()),
+      address_proof: v.optional(v.string()),
+      status: v.union(v.literal("pending"), v.literal("verified"), v.literal("rejected")),
+    })),
+    shipping_setup: v.optional(v.object({
+      pudo_account_id: v.optional(v.string()),
+      manual_address: v.optional(v.string()),
+    })),
     createdAt: v.number(),
   }).index("by_email", ["email"]),
 
@@ -23,10 +51,16 @@ export default defineSchema({
       v.literal("clearance"),
       v.literal("out_of_season"),
       v.literal("odd_sizing"),
-      v.literal("closing_down")
+      v.literal("closing_down"),
     ),
     inventory_count: v.number(),
-    pudo_box_size_required: v.union(v.literal("XS"), v.literal("S"), v.literal("M"), v.literal("L"), v.literal("XL")),
+    pudo_box_size_required: v.union(
+      v.literal("XS"),
+      v.literal("S"),
+      v.literal("M"),
+      v.literal("L"),
+      v.literal("XL"),
+    ),
     image_url: v.optional(v.string()),
     is_active: v.boolean(),
     createdAt: v.number(),
@@ -43,7 +77,7 @@ export default defineSchema({
       v.literal("pending"),
       v.literal("in_transit"),
       v.literal("ready_for_pickup"),
-      v.literal("collected")
+      v.literal("collected"),
     ),
     pudo_tracking_number: v.optional(v.string()),
     selected_locker_id: v.optional(v.string()),
@@ -70,7 +104,10 @@ export default defineSchema({
     name: v.string(),
     address: v.string(),
     province: v.string(),
-    coordinates: v.object({ lat: v.number(), lng: v.number() }),
+    coordinates: v.object({
+      lat: v.number(),
+      lng: v.number(),
+    }),
     is_active: v.boolean(),
   })
     .index("by_province", ["province"])

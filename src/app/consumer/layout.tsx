@@ -1,70 +1,56 @@
 "use client";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Home, Grid3X3, Package, MessageSquare, User } from "lucide-react";
-import { cn } from "@/lib/utils";
 
-const navItems = [
-  { href: "/consumer/marketplace", label: "Discover", icon: Home },
-  { href: "/consumer/claims", label: "My Claims", icon: Package },
-  { href: "/consumer/surveys", label: "Surveys", icon: MessageSquare },
-  { href: "/consumer/profile", label: "Profile", icon: User },
+import * as React from "react";
+import { Sidebar, NavItem } from "@/components/shared/sidebar";
+import { 
+  Store, 
+  PackageCheck, 
+  ClipboardCheck, 
+  UserCircle 
+} from "lucide-react";
+
+const consumerNavItems: NavItem[] = [
+  {
+    label: "Marketplace",
+    href: "/consumer/marketplace",
+    icon: Store,
+  },
+  {
+    label: "My Claims",
+    href: "/consumer/claims",
+    icon: PackageCheck,
+  },
+  {
+    label: "Surveys",
+    href: "/consumer/surveys",
+    icon: ClipboardCheck,
+  },
+  {
+    label: "Profile",
+    href: "/consumer/profile",
+    icon: UserCircle,
+  },
 ];
 
-export default function ConsumerLayout({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
+const mockUser = {
+  name: "Thabo Mokoena",
+  email: "thabo@proe.co.za",
+  role: "consumer",
+};
 
+export default function ConsumerLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <div className="min-h-screen bg-bg-primary flex">
-      {/* Desktop Sidebar */}
-      <aside className="hidden md:flex flex-col w-60 border-r border-border bg-bg-card fixed h-full">
-        <div className="px-6 py-5 border-b border-border">
-          <Link href="/" className="font-serif text-2xl text-accent-primary">Proe</Link>
+    <div className="min-h-screen bg-bg-primary">
+      <Sidebar items={consumerNavItems} user={mockUser} />
+      <main className="lg:pl-60 pb-20 lg:pb-0">
+        <div className="max-w-7xl mx-auto p-6 lg:p-8">
+          {children}
         </div>
-        <nav className="flex-1 p-4 space-y-1">
-          {navItems.map((item) => {
-            const isActive = pathname === item.href;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-3 px-4 py-3 rounded transition-colors text-sm font-medium",
-                  isActive ? "bg-accent-primary/10 text-accent-primary border-l-2 border-accent-primary" : "text-text-secondary hover:bg-bg-secondary"
-                )}
-              >
-                <item.icon className="w-4 h-4" />
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
-      </aside>
-
-      {/* Main Content */}
-      <div className="flex-1 md:ml-60 pb-20 md:pb-0">
-        {children}
-      </div>
-
-      {/* Mobile Bottom Nav */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-border flex justify-around py-3 z-40">
-        {navItems.map((item) => {
-          const isActive = pathname === item.href;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex flex-col items-center gap-1 text-xs",
-                isActive ? "text-accent-primary" : "text-text-muted"
-              )}
-            >
-              <item.icon className="w-5 h-5" />
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
+      </main>
     </div>
   );
 }

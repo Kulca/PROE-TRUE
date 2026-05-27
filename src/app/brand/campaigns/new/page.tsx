@@ -1,71 +1,118 @@
 "use client";
-import { useState } from "react";
+
+import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
-import { CATEGORIES, BOX_SIZES } from "@/lib/utils";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { ChevronLeft, Info } from "lucide-react";
+import Link from "next/link";
+import { useToast } from "@/components/ui/toast";
 
 export default function NewCampaignPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({
-    title: "",
-    description: "",
-    category: "new_launch",
-    inventory_count: "",
-    box_size: "M" as keyof typeof BOX_SIZES,
-  });
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = React.useState(false);
+
+  const categories = [
+    { value: "new_launch", label: "New Launch" },
+    { value: "clearance", label: "Clearance" },
+    { value: "out_of_season", label: "Out of Season" },
+    { value: "odd_sizing", label: "Odd Sizing" },
+    { value: "closing_down", label: "Closing Down Inventory" },
+  ];
+
+  const boxSizes = [
+    { value: "XS", label: "XS (1-2 small items)" },
+    { value: "S", label: "S (Shoebox size)" },
+    { value: "M", label: "M (Medium box)" },
+    { value: "L", label: "L (Large box)" },
+    { value: "XL", label: "XL (Bulk shipment)" },
+  ];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setTimeout(() => { setLoading(false); router.push("/brand/campaigns"); }, 1000);
+    setIsLoading(true);
+    // Mock campaign creation
+    setTimeout(() => {
+      setIsLoading(false);
+      toast("success", "Campaign created successfully!");
+      router.push("/brand/campaigns");
+    }, 1500);
   };
 
   return (
-    <main className="p-6 max-w-2xl mx-auto">
-      <div className="mb-8">
-        <h1 className="font-serif text-4xl mb-2">Launch Campaign</h1>
-        <p className="text-text-secondary">Create a new freebie campaign for SA testers.</p>
+    <div className="space-y-8 animate-page">
+      <div className="flex items-center gap-4">
+        <Link href="/brand/campaigns">
+          <Button variant="ghost" size="sm" className="h-9 w-9 p-0">
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+        </Link>
+        <div className="flex flex-col gap-0.5">
+          <h1 className="text-2xl font-serif text-text-primary">New Campaign</h1>
+          <p className="text-sm text-text-secondary">Fill in the details to launch your freebie.</p>
+        </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <Card className="p-5 space-y-4">
-          <Input label="Campaign Title" id="title" placeholder="e.g. Rooibos Ice Tea Sampler" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm text-text-secondary font-medium">Description</label>
-            <textarea
-              id="description"
-              placeholder="Describe the product and what testers will receive..."
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              className="h-24 px-4 py-3 border border-border rounded bg-white text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-primary focus:ring-2 focus:ring-accent-primary/20 resize-none"
-              required
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm text-text-secondary font-medium">Category</label>
-              <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="h-11 px-4 border border-border rounded bg-white focus:outline-none focus:border-accent-primary">
-                {Object.entries(CATEGORIES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-              </select>
-            </div>
-            <Input label="Stock Count" id="count" type="number" min="1" placeholder="e.g. 100" value={form.inventory_count} onChange={(e) => setForm({ ...form, inventory_count: e.target.value })} required />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm text-text-secondary font-medium">PUDO Box Size</label>
-            <select value={form.box_size} onChange={(e) => setForm({ ...form, box_size: e.target.value as keyof typeof BOX_SIZES })} className="h-11 px-4 border border-border rounded bg-white focus:outline-none focus:border-accent-primary">
-              {Object.entries(BOX_SIZES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-            </select>
-            <p className="text-xs text-text-muted">Used to calculate PUDO shipping costs.</p>
-          </div>
+      <div className="max-w-2xl mx-auto">
+        <Card>
+          <form onSubmit={handleSubmit}>
+            <CardHeader>
+              <CardTitle>Campaign Details</CardTitle>
+              <CardDescription>Give your campaign a title and description that will appeal to testers.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <Input label="Campaign Title" placeholder="e.g. Summer Skincare Trial Kit" required />
+              
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-text-secondary">Description</label>
+                <textarea 
+                  className="flex min-h-[120px] w-full rounded-subtle border border-border bg-white px-3 py-2 text-sm placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary focus-visible:border-accent-primary disabled:cursor-not-allowed disabled:opacity-50 transition-all"
+                  placeholder="Tell testers about what they're getting and why you're sharing it..."
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-text-secondary">Category</label>
+                  <select className="flex h-11 w-full rounded-subtle border border-border bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary focus-visible:border-accent-primary">
+                    {categories.map((c) => (
+                      <option key={c.value} value={c.value}>{c.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <Input label="Inventory Count" type="number" placeholder="500" min="1" required />
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-text-secondary">PUDO Box Size Required</label>
+                  <div className="flex items-center gap-1 text-xs text-accent-secondary">
+                    <Info className="h-3 w-3" />
+                    <span>View size guide</span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {boxSizes.map((size) => (
+                    <label key={size.value} className="flex items-center gap-3 p-3 rounded-card border border-border hover:border-accent-primary transition-colors cursor-pointer group">
+                      <input type="radio" name="boxSize" value={size.value} className="accent-accent-primary" required />
+                      <span className="text-sm font-medium text-text-primary group-hover:text-accent-primary transition-colors">{size.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter className="flex justify-end gap-3 pt-6 border-t border-border">
+              <Link href="/brand/campaigns">
+                <Button variant="secondary" type="button">Cancel</Button>
+              </Link>
+              <Button type="submit" isLoading={isLoading}>Launch Campaign</Button>
+            </CardFooter>
+          </form>
         </Card>
-        <div className="flex gap-3">
-          <Button type="button" variant="secondary" onClick={() => router.push("/brand/campaigns")} className="flex-1">Cancel</Button>
-          <Button type="submit" loading={loading} className="flex-1">Launch Campaign</Button>
-        </div>
-      </form>
-    </main>
+      </div>
+    </div>
   );
 }
