@@ -1,18 +1,30 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Search, Filter, MapPin, Package } from "lucide-react";
+import { Search, Filter, MapPin, Package, LogIn } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 
 export default function MarketplacePage() {
   const { toast } = useToast();
+  const router = useRouter();
   const [selectedCampaign, setSelectedCampaign] = React.useState<any>(null);
   const [isClaiming, setIsClaiming] = React.useState(false);
+  const [isGuest, setIsGuest] = React.useState(false);
+  const [showAuthModal, setShowAuthModal] = React.useState(false);
+
+  React.useEffect(() => {
+    const guestData = localStorage.getItem("proe-guest");
+    if (guestData) {
+      setIsGuest(true);
+    }
+  }, []);
 
   const campaigns = [
     {
@@ -58,6 +70,10 @@ export default function MarketplacePage() {
   ];
 
   const handleClaim = () => {
+    if (isGuest) {
+      setShowAuthModal(true);
+      return;
+    }
     setIsClaiming(true);
     setTimeout(() => {
       setIsClaiming(false);
@@ -68,6 +84,28 @@ export default function MarketplacePage() {
 
   return (
     <div className="space-y-8 animate-page">
+      {isGuest && (
+        <div className="bg-accent-secondary text-white px-6 py-3 rounded-card flex items-center justify-between shadow-md border-l-4 border-accent-primary">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-white/10 rounded-full">
+              <Package className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-sm font-bold">Browsing as guest</p>
+              <p className="text-xs text-white/80">Sign in to claim these freebies and start tasting!</p>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <Link href="/login">
+              <Button size="sm" variant="ghost" className="text-white hover:bg-white/10">Login</Button>
+            </Link>
+            <Link href="/register">
+              <Button size="sm" className="bg-white text-accent-secondary hover:bg-white/90 border-none">Register</Button>
+            </Link>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col gap-1">
         <h1 className="text-3xl font-serif text-text-primary">Freebie Marketplace</h1>
         <p className="text-text-secondary">Discover and claim free samples from your favorite brands.</p>
@@ -180,6 +218,27 @@ export default function MarketplacePage() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Auth Modal for Guests */}
+      <Modal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        title="Sign in to continue"
+      >
+        <div className="text-center space-y-6 py-4">
+          <div className="w-16 h-16 bg-accent-primary/10 rounded-full flex items-center justify-center mx-auto">
+            <LogIn className="h-8 w-8 text-accent-primary" />
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-xl font-serif">Tasting is better with friends</h3>
+            <p className="text-sm text-text-secondary">You need a Proe account to claim samples and track your orders.</p>
+          </div>
+          <div className="grid grid-cols-2 gap-4 pt-4">
+            <Button variant="secondary" onClick={() => router.push("/login")}>Login</Button>
+            <Button variant="primary" onClick={() => router.push("/register")}>Create Account</Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

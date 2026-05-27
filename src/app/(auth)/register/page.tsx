@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { User, Building2, ArrowRight } from "lucide-react";
+import { User, Building2, ArrowRight, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function RegisterPage() {
@@ -14,11 +14,21 @@ export default function RegisterPage() {
   const searchParams = useSearchParams();
   const initialRole = searchParams.get("role") === "brand" ? "brand" : "consumer";
   
-  const [role, setRole] = React.useState<"brand" | "consumer">(initialRole);
+  const [role, setRole] = React.useState<"brand" | "consumer" | "browser">(initialRole);
   const [step, setStep] = React.useState(1);
   const [isLoading, setIsLoading] = React.useState(false);
 
-  const handleRoleSelect = (selectedRole: "brand" | "consumer") => {
+  const handleRoleSelect = (selectedRole: "brand" | "consumer" | "browser") => {
+    if (selectedRole === "browser") {
+      const guestId = Math.random().toString(36).substring(2, 11);
+      localStorage.setItem("proe-guest", JSON.stringify({
+        role: "browser",
+        guestId,
+        createdAt: Date.now()
+      }));
+      router.push("/consumer/marketplace");
+      return;
+    }
     setRole(selectedRole);
     setStep(2);
   };
@@ -77,6 +87,23 @@ export default function RegisterPage() {
                 <div>
                   <h3 className="font-medium text-text-primary">I&apos;m a Brand</h3>
                   <p className="text-sm text-text-secondary">List products and get feedback from consumers.</p>
+                </div>
+                <ArrowRight className="ml-auto h-5 w-5 text-text-muted" />
+              </button>
+
+              <button
+                onClick={() => handleRoleSelect("browser")}
+                className={cn(
+                  "flex items-center gap-4 p-6 rounded-card border-2 transition-all text-left bg-bg-card",
+                  role === "browser" ? "border-accent-primary" : "border-transparent hover:border-border"
+                )}
+              >
+                <div className="w-12 h-12 rounded-full bg-text-muted/10 flex items-center justify-center shrink-0">
+                  <Eye className="h-6 w-6 text-text-muted" />
+                </div>
+                <div>
+                  <h3 className="font-medium text-text-primary">I&apos;m just browsing</h3>
+                  <p className="text-sm text-text-secondary">Explore the marketplace without an account.</p>
                 </div>
                 <ArrowRight className="ml-auto h-5 w-5 text-text-muted" />
               </button>
