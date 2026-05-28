@@ -103,6 +103,25 @@ export default function NewCampaignPage() {
                   ))}
                 </div>
               </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-text-secondary">Campaign Story (for Billboard)</label>
+                <textarea
+                  className="flex min-h-[80px] w-full rounded-subtle border border-border bg-white px-3 py-2 text-sm placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary focus-visible:border-accent-primary"
+                  placeholder="Tell your brand story or why you're offering this freebie. This may appear in the billboard carousel..."
+                />
+                <p className="text-xs text-text-muted">Optional — Campaigns with a story are eligible for billboard carousel placement.</p>
+              </div>
+
+              <div className="p-4 rounded-card bg-bg-secondary border border-border">
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-col gap-0.5">
+                    <label className="text-sm font-medium text-text-primary">Opt-in for Billboard Placement</label>
+                    <p className="text-xs text-text-muted">Get your campaign featured in the SA marketplace hero carousel. Requires a campaign story above.</p>
+                  </div>
+                  <input type="checkbox" name="billboard_opt_in" className="accent-accent-primary w-5 h-5" />
+                </div>
+              </div>
             </CardContent>
             <CardFooter className="flex justify-end gap-3 pt-6 border-t border-border">
               <Link href="/brand/campaigns">

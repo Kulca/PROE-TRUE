@@ -7,7 +7,7 @@ export default defineSchema({
     email: v.string(),
     password: v.optional(v.string()),
     phone_number: v.optional(v.string()),
-    role: v.union(v.literal("brand"), v.literal("consumer")),
+    role: v.union(v.literal("brand"), v.literal("consumer"), v.literal("admin")),
     preferred_pudo_locker_id: v.optional(v.string()),
     pudo_locker_address: v.optional(v.string()),
     size_preferences: v.optional(v.array(v.string())),
@@ -39,8 +39,11 @@ export default defineSchema({
       pudo_account_id: v.optional(v.string()),
       manual_address: v.optional(v.string()),
     })),
+    is_verified: v.boolean(),
     createdAt: v.number(),
-  }).index("by_email", ["email"]),
+  }).index("by_email", ["email"])
+    .index("by_role", ["role"])
+    .index("by_verified", ["is_verified"]),
 
   campaigns: defineTable({
     brand_id: v.id("users"),
@@ -63,11 +66,15 @@ export default defineSchema({
     ),
     image_url: v.optional(v.string()),
     is_active: v.boolean(),
+    is_featured: v.boolean(),
+    billboard_opt_in: v.boolean(),
+    campaign_story: v.optional(v.string()),
     createdAt: v.number(),
   })
     .index("by_brand", ["brand_id"])
     .index("by_category", ["category"])
-    .index("by_active", ["is_active"]),
+    .index("by_active", ["is_active"])
+    .index("by_featured", ["is_featured"]),
 
   claims: defineTable({
     user_id: v.id("users"),
