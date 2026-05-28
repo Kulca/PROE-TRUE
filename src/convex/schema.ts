@@ -7,7 +7,7 @@ export default defineSchema({
     email: v.string(),
     password: v.optional(v.string()),
     phone_number: v.optional(v.string()),
-    role: v.union(v.literal("brand"), v.literal("consumer")),
+    role: v.union(v.literal("brand"), v.literal("consumer"), v.literal("admin")),
     preferred_pudo_locker_id: v.optional(v.string()),
     pudo_locker_address: v.optional(v.string()),
     size_preferences: v.optional(v.array(v.string())),
@@ -63,6 +63,9 @@ export default defineSchema({
     ),
     image_url: v.optional(v.string()),
     is_active: v.boolean(),
+    featured: v.optional(v.boolean()),
+    story: v.optional(v.string()),
+    billboard_opt_in: v.optional(v.boolean()),
     createdAt: v.number(),
   })
     .index("by_brand", ["brand_id"])

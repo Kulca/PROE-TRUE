@@ -17,6 +17,30 @@ const boxSize = v.union(
   v.literal("XL"),
 );
 
+export const listActive = query({
+  args: {},
+  handler: async (ctx) => {
+    const campaigns = await ctx.db
+      .query("campaigns")
+      .withIndex("by_active", (q) => q.eq("is_active", true))
+      .order("desc")
+      .collect();
+    
+    return await Promise.all(
+      campaigns.map(async (c) => {
+        const brand = await ctx.db.get(c.brand_id);
+        return {
+          ...c,
+          brand: brand ? {
+            name: brand.name,
+            is_verified: brand.verification_docs?.status === "verified",
+          } : null
+        };
+      })
+    );
+  },
+});
+
 export const create = mutation({
   args: {
     brand_id: v.id("users"),
@@ -26,6 +50,8 @@ export const create = mutation({
     inventory_count: v.number(),
     pudo_box_size_required: boxSize,
     image_url: v.optional(v.string()),
+    story: v.optional(v.string()),
+    billboard_opt_in: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     if (args.inventory_count <= 0) {
@@ -38,9 +64,15 @@ export const create = mutation({
     }
 
     const campaignId = await ctx.db.insert("campaigns", {
-      ...args,
+      brand_id: args.brand_id,
       title: args.title.trim(),
       description: args.description.trim(),
+      category: args.category,
+      inventory_count: args.inventory_count,
+      pudo_box_size_required: args.pudo_box_size_required,
+      image_url: args.image_url,
+      story: args.story?.trim(),
+      billboard_opt_in: args.billboard_opt_in ?? false,
       is_active: true,
       createdAt: Date.now(),
     });
