@@ -16,7 +16,7 @@ export const signUp = mutation({
     const email = normalizeEmail(args.email);
     const existingUser = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", email))
+      .withIndex("by_email", (q: any) => q.eq("email", email))
       .unique();
 
     if (existingUser) {

@@ -134,7 +134,7 @@ export default function MyClaimsPage() {
                         <span className="text-xs font-bold uppercase tracking-tight">Survey Required</span>
                       </div>
                       <Link href="/consumer/surveys">
-                        <Button variant="warning" size="sm" className="w-full">
+                        <Button variant="secondary" size="sm" className="w-full">
                           <ClipboardCheck className="mr-2 h-4 w-4" /> Take Survey
                         </Button>
                       </Link>
