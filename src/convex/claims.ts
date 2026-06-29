@@ -142,10 +142,55 @@ export const updateStatus = mutation({
       throw new Error("Claim not found.");
     }
 
+    const campaign = await ctx.db.get(claim.campaign_id);
+
     await ctx.db.patch(args.claim_id, {
       shipping_status: args.shipping_status,
       pudo_tracking_number: args.pudo_tracking_number ?? claim.pudo_tracking_number,
     });
+
+    // Charge commission when item is collected (on free tier)
+    if (args.shipping_status === "collected" && campaign) {
+      const sub = await ctx.db
+        .query("subscriptions")
+        .withIndex("by_user", (q) => q.eq("user_id", campaign.brand_id))
+        .first();
+
+      const isPremium = sub && sub.tier === "premium" && sub.status === "active";
+
+      if (!isPremium) {
+        const now = Date.now();
+        const COMMISSION = 5;
+
+        let balance = await ctx.db
+          .query("brand_balances")
+          .withIndex("by_brand", (q) => q.eq("brand_id", campaign.brand_id))
+          .first();
+
+        if (!balance) {
+          const id = await ctx.db.insert("brand_balances", {
+            brand_id: campaign.brand_id,
+            balance_zar: 0,
+            pending_commission_zar: 0,
+            createdAt: now,
+            updatedAt: now,
+          });
+          balance = await ctx.db.get(id);
+        }
+
+        const newBalance = Math.max(0, balance!.balance_zar - COMMISSION);
+        await ctx.db.patch(balance!._id, { balance_zar: newBalance, updatedAt: now });
+
+        await ctx.db.insert("transactions", {
+          brand_id: campaign.brand_id,
+          type: "commission_charged",
+          amount_zar: -COMMISSION,
+          claim_id: args.claim_id,
+          description: `Commission charged for collected claim`,
+          createdAt: now,
+        });
+      }
+    }
 
     return { success: true };
   },

@@ -7,7 +7,8 @@ import {
   Megaphone, 
   Truck, 
   BarChart3, 
-  Settings 
+  Settings,
+  CreditCard 
 } from "lucide-react";
 
 const brandNavItems: NavItem[] = [
@@ -30,6 +31,11 @@ const brandNavItems: NavItem[] = [
     label: "Analytics",
     href: "/brand/analytics",
     icon: BarChart3,
+  },
+  {
+    label: "Billing",
+    href: "/brand/billing",
+    icon: CreditCard,
   },
   {
     label: "Settings",

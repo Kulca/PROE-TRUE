@@ -106,6 +106,93 @@ export default defineSchema({
     .index("by_campaign", ["campaign_id"])
     .index("by_claim", ["claim_id"]),
 
+  subscriptions: defineTable({
+    user_id: v.id("users"),
+    tier: v.union(v.literal("free"), v.literal("premium")),
+    status: v.union(
+      v.literal("active"),
+      v.literal("cancelled"),
+      v.literal("past_due"),
+      v.literal("trialing"),
+    ),
+    provider: v.literal("payu"),
+    provider_subscription_id: v.optional(v.string()),
+    provider_customer_id: v.optional(v.string()),
+    current_period_start: v.number(),
+    current_period_end: v.number(),
+    cancelled_at: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["user_id"])
+    .index("by_status", ["status"])
+    .index("by_provider_sub", ["provider_subscription_id"]),
+
+  invoices: defineTable({
+    user_id: v.id("users"),
+    subscription_id: v.optional(v.id("subscriptions")),
+    amount_zar: v.number(),
+    status: v.union(
+      v.literal("paid"),
+      v.literal("pending"),
+      v.literal("failed"),
+      v.literal("refunded"),
+    ),
+    provider: v.literal("payu"),
+    provider_invoice_id: v.optional(v.string()),
+    description: v.string(),
+    paid_at: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["user_id"])
+    .index("by_status", ["status"])
+    .index("by_subscription", ["subscription_id"]),
+
+  brand_balances: defineTable({
+    brand_id: v.id("users"),
+    balance_zar: v.number(),
+    pending_commission_zar: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_brand", ["brand_id"]),
+
+  transactions: defineTable({
+    brand_id: v.id("users"),
+    type: v.union(
+      v.literal("commission_charged"),
+      v.literal("subscription_charge"),
+      v.literal("payout"),
+      v.literal("refund"),
+      v.literal("topup"),
+    ),
+    amount_zar: v.number(),
+    claim_id: v.optional(v.id("claims")),
+    invoice_id: v.optional(v.id("invoices")),
+    description: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_brand", ["brand_id"])
+    .index("by_type", ["type"])
+    .index("by_created", ["createdAt"]),
+
+  payouts: defineTable({
+    brand_id: v.id("users"),
+    amount_zar: v.number(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("processing"),
+      v.literal("completed"),
+      v.literal("failed"),
+    ),
+    provider: v.literal("payu"),
+    provider_payout_id: v.optional(v.string()),
+    bank_account: v.string(),
+    requested_at: v.number(),
+    processed_at: v.optional(v.number()),
+  })
+    .index("by_brand", ["brand_id"])
+    .index("by_status", ["status"]),
+
   pudo_lockers: defineTable({
     locker_id: v.string(),
     name: v.string(),
