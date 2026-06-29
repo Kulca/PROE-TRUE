@@ -1,33 +1,25 @@
 "use client";
 
 import * as React from "react";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, Megaphone, Package, ClipboardCheck, TrendingUp } from "lucide-react";
 
-const MOCK_STATS = {
-  totalUsers: 284,
-  totalBrands: 47,
-  totalConsumers: 237,
-  verifiedBrands: 31,
-  pendingVerification: 8,
-  totalCampaigns: 63,
-  activeCampaigns: 24,
-  totalClaims: 891,
-  collectedClaims: 743,
-  totalSurveys: 612,
-  avgRating: 4.3,
-};
-
-const STATS = [
-  { label: "Total Users", value: MOCK_STATS.totalUsers, icon: Users, color: "accent" },
-  { label: "Active Campaigns", value: MOCK_STATS.activeCampaigns, icon: Megaphone, color: "warning" },
-  { label: "Claims Collected", value: MOCK_STATS.collectedClaims, icon: Package, color: "secondary" },
-  { label: "Surveys Submitted", value: MOCK_STATS.totalSurveys, icon: ClipboardCheck, color: "accent" },
-  { label: "Verified Brands", value: MOCK_STATS.verifiedBrands, icon: TrendingUp, color: "accent" },
-  { label: "Pending Verification", value: MOCK_STATS.pendingVerification, icon: Users, color: "warning" },
-];
-
 export default function AdminDashboardPage() {
+  const stats = useQuery(api.admin.getStats, {});
+
+  const STATS_CARDS = stats
+    ? [
+        { label: "Total Users", value: stats.totalUsers, icon: Users },
+        { label: "Active Campaigns", value: stats.activeCampaigns, icon: Megaphone },
+        { label: "Claims Collected", value: stats.collectedClaims, icon: Package },
+        { label: "Surveys Submitted", value: stats.totalSurveys, icon: ClipboardCheck },
+        { label: "Verified Brands", value: stats.verifiedBrands, icon: TrendingUp },
+        { label: "Pending Verification", value: stats.pendingVerification, icon: Users },
+      ]
+    : [];
+
   return (
     <div className="space-y-8">
       <div>
@@ -35,11 +27,17 @@ export default function AdminDashboardPage() {
         <p className="text-text-secondary mt-1">Live stats across all modules.</p>
       </div>
 
+      {stats === undefined && (
+        <div className="text-center py-16">
+          <p className="text-text-muted">Loading stats...</p>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {STATS.map(({ label, value, icon: Icon, color }) => (
+        {STATS_CARDS.map(({ label, value, icon: Icon }) => (
           <Card key={label}>
             <CardContent className="p-6 flex items-center gap-4">
-              <div className={`w-12 h-12 rounded-card flex items-center justify-center bg-${color}/10`}>
+              <div className="w-12 h-12 rounded-card flex items-center justify-center bg-accent-primary/10">
                 <Icon className="h-6 w-6 text-accent-primary" />
               </div>
               <div>
@@ -54,39 +52,57 @@ export default function AdminDashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg font-serif">Recent Activity</CardTitle>
+            <CardTitle className="text-lg font-serif">Platform Summary</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {[
-              { text: "New brand registered: Cape Brew Co.", time: "2 min ago" },
-              { text: "Campaign approved: Summer Skincare Trial Kit", time: "15 min ago" },
-              { text: "Brand verified: Glow Beauty", time: "1 hr ago" },
-              { text: "New claim: Roobois Ice Tea Sampler", time: "2 hr ago" },
-              { text: "Survey submitted: 5-star rating", time: "3 hr ago" },
-            ].map((item, i) => (
-              <div key={i} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                <p className="text-sm text-text-primary">{item.text}</p>
-                <span className="text-xs text-text-muted">{item.time}</span>
-              </div>
-            ))}
+            {stats && (
+              <>
+                <div className="flex items-center justify-between py-2 border-b border-border">
+                  <p className="text-sm text-text-primary">Total Brands</p>
+                  <span className="font-medium">{stats.totalBrands}</span>
+                </div>
+                <div className="flex items-center justify-between py-2 border-b border-border">
+                  <p className="text-sm text-text-primary">Total Consumers</p>
+                  <span className="font-medium">{stats.totalConsumers}</span>
+                </div>
+                <div className="flex items-center justify-between py-2 border-b border-border">
+                  <p className="text-sm text-text-primary">Total Campaigns</p>
+                  <span className="font-medium">{stats.totalCampaigns}</span>
+                </div>
+                <div className="flex items-center justify-between py-2 border-b border-border">
+                  <p className="text-sm text-text-primary">Total Claims</p>
+                  <span className="font-medium">{stats.totalClaims}</span>
+                </div>
+                <div className="flex items-center justify-between py-2">
+                  <p className="text-sm text-text-primary">Average Rating</p>
+                  <span className="font-medium">{stats.avgRating.toFixed(1)} / 5</span>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg font-serif">Pending Actions</CardTitle>
+            <CardTitle className="text-lg font-serif">Verification Status</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {[
-              { text: "8 brands awaiting verification", action: "Review now" },
-              { text: "3 campaigns pending approval", action: "Review now" },
-              { text: "12 claims need tracking update", action: "Update" },
-            ].map((item, i) => (
-              <div key={i} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                <p className="text-sm text-text-primary">{item.text}</p>
-                <button className="text-xs text-accent-primary font-medium hover:underline">{item.action}</button>
-              </div>
-            ))}
+            {stats && (
+              <>
+                <div className="flex items-center justify-between py-2 border-b border-border">
+                  <p className="text-sm text-text-primary">Verified Brands</p>
+                  <span className="font-medium text-accent-primary">{stats.verifiedBrands}</span>
+                </div>
+                <div className="flex items-center justify-between py-2 border-b border-border">
+                  <p className="text-sm text-text-primary">Pending Verification</p>
+                  <span className="font-medium text-warning">{stats.pendingVerification}</span>
+                </div>
+                <div className="flex items-center justify-between py-2">
+                  <p className="text-sm text-text-primary">Unverified</p>
+                  <span className="font-medium text-text-muted">{stats.totalBrands - stats.verifiedBrands - stats.pendingVerification}</span>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
