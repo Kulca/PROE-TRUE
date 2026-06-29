@@ -1,7 +1,9 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import bcrypt from "bcryptjs";
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
+const SALT_ROUNDS = 10;
 
 export const signUp = mutation({
   args: {
@@ -23,10 +25,16 @@ export const signUp = mutation({
       throw new Error("An account with this email already exists.");
     }
 
+    // Hash the password if provided
+    let hashedPassword: string | undefined;
+    if (args.password) {
+      hashedPassword = bcrypt.hashSync(args.password, SALT_ROUNDS);
+    }
+
     const userId = await ctx.db.insert("users", {
       name: args.name.trim(),
       email,
-      password: args.password,
+      password: hashedPassword,
       phone_number: args.phone_number,
       role: args.role,
       preferred_pudo_locker_id: undefined,
@@ -59,8 +67,13 @@ export const signIn = mutation({
       throw new Error("No account found for this email.");
     }
 
-    if (user.password && args.password !== user.password) {
-      throw new Error("Invalid password.");
+    if (user.password && args.password) {
+      // Support both bcrypt hashes and legacy plain-text passwords
+      const isValid = bcrypt.compareSync(args.password, user.password)
+        || user.password === args.password;
+      if (!isValid) {
+        throw new Error("Invalid password.");
+      }
     }
 
     return {

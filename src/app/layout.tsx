@@ -26,6 +26,7 @@ export const metadata: Metadata = {
 
 import { ToastProvider } from "@/components/ui/toast";
 import { ConvexClientProvider } from "@/components/convex-client-provider";
+import { AuthProvider } from "@/components/auth-provider";
 
 export default function RootLayout({
   children,
@@ -39,11 +40,13 @@ export default function RootLayout({
       jetbrainsMono.variable
     )}>
       <body className="bg-bg-primary text-text-primary antialiased font-sans">
-        <ConvexClientProvider>
-          <ToastProvider>
-            {children}
-          </ToastProvider>
-        </ConvexClientProvider>
+        <AuthProvider>
+          <ConvexClientProvider>
+            <ToastProvider>
+              {children}
+            </ToastProvider>
+          </ConvexClientProvider>
+        </AuthProvider>
       </body>
     </html>
   );
