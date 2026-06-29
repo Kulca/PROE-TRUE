@@ -1,54 +1,95 @@
 "use client";
 
 import * as React from "react";
+import { useSession } from "next-auth/react";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  Users, 
-  Megaphone, 
-  CheckCircle2, 
+import {
+  Users,
+  Megaphone,
+  CheckCircle2,
   TrendingUp,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
+  Truck,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 export default function BrandDashboardPage() {
+  const { data: session } = useSession();
+  const userId = (session?.user as any)?.id;
+
+  const campaigns = useQuery(
+    api.campaigns.listByBrand,
+    userId ? { brand_id: userId } : "skip"
+  );
+  const activeCampaigns = React.useMemo(() => {
+    if (!campaigns) return [];
+    return campaigns.filter((c: any) => c.is_active);
+  }, [campaigns]);
+
+  const totalClaims = React.useMemo(() => {
+    if (!campaigns) return 0;
+    // Rough estimate from inventory difference
+    return campaigns.reduce((sum: number, c: any) => sum + c.inventory_count, 0);
+  }, [campaigns]);
+
+  const avgProgress = React.useMemo(() => {
+    if (!campaigns || campaigns.length === 0) return 0;
+    // Not exact since we don't have claim counts, but show what we have
+    return activeCampaigns.length;
+  }, [campaigns, activeCampaigns]);
+
   const stats = [
     {
-      title: "Total Claims",
-      value: "1,284",
-      change: "+12.5%",
-      trend: "up",
-      icon: Users,
-    },
-    {
       title: "Active Campaigns",
-      value: "3",
-      change: "Stable",
-      trend: "neutral",
+      value: activeCampaigns.length.toString(),
+      change: campaigns ? `${campaigns.length} total` : "—",
+      trend: "neutral" as const,
       icon: Megaphone,
     },
     {
-      title: "Completion Rate",
-      value: "94.2%",
-      change: "+2.1%",
-      trend: "up",
+      title: "Total Inventory",
+      value: totalClaims.toString(),
+      change: "Items",
+      trend: "neutral" as const,
+      icon: Users,
+    },
+    {
+      title: "Active Count",
+      value: campaigns ? campaigns.filter((c: any) => c.is_active).length.toString() : "0",
+      change: "campaigns live",
+      trend: "up" as const,
       icon: CheckCircle2,
     },
     {
-      title: "Avg. Rating",
-      value: "4.8",
-      change: "-0.1",
-      trend: "down",
+      title: "Categories",
+      value: campaigns
+        ? [...new Set(campaigns.map((c: any) => c.category))].length.toString()
+        : "0",
+      change: "unique",
+      trend: "neutral" as const,
       icon: TrendingUp,
     },
   ];
+
+  if (!userId) {
+    return (
+      <div className="space-y-8 animate-page">
+        <h1 className="text-3xl font-serif text-text-primary">Dashboard Overview</h1>
+        <p className="text-text-secondary">Please sign in as a brand to view your dashboard.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 animate-page">
       <div className="flex flex-col gap-1">
         <h1 className="text-3xl font-serif text-text-primary">Dashboard Overview</h1>
-        <p className="text-text-secondary">Welcome back! Here's what's happening with your brand today.</p>
+        <p className="text-text-secondary">Welcome back! Here&apos;s what&apos;s happening with your brand today.</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -71,7 +112,6 @@ export default function BrandDashboardPage() {
                 )}>
                   {stat.change}
                 </span>
-                <span className="text-xs text-text-muted ml-1">vs last month</span>
               </div>
             </CardContent>
           </Card>
@@ -79,25 +119,22 @@ export default function BrandDashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Recent Campaigns */}
+        {/* Active Campaigns */}
         <Card className="lg:col-span-1">
           <CardHeader>
             <CardTitle className="text-xl font-serif">Active Campaigns</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {[
-              { name: "Summer Skincare Set", status: "Active", claims: 450, total: 500 },
-              { name: "Organic Energy Bar", status: "Active", claims: 120, total: 200 },
-              { name: "Premium Coffee Pods", status: "Paused", claims: 85, total: 100 },
-            ].map((campaign) => (
-              <div key={campaign.name} className="flex items-center justify-between p-3 rounded-card bg-bg-secondary/50">
+            {activeCampaigns.length === 0 && (
+              <p className="text-sm text-text-muted">No active campaigns yet.</p>
+            )}
+            {activeCampaigns.slice(0, 5).map((campaign: any) => (
+              <div key={campaign._id} className="flex items-center justify-between p-3 rounded-card bg-bg-secondary/50">
                 <div>
-                  <p className="font-medium text-text-primary">{campaign.name}</p>
-                  <p className="text-xs text-text-muted">{campaign.claims} / {campaign.total} claimed</p>
+                  <p className="font-medium text-text-primary">{campaign.title}</p>
+                  <p className="text-xs text-text-muted">{campaign.inventory_count} units remaining</p>
                 </div>
-                <Badge variant={campaign.status === "Active" ? "success" : "warning"}>
-                  {campaign.status}
-                </Badge>
+                <Badge variant="success">Active</Badge>
               </div>
             ))}
           </CardContent>
@@ -109,25 +146,21 @@ export default function BrandDashboardPage() {
             <CardTitle className="text-xl font-serif">Quick Actions</CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <button className="flex flex-col items-center justify-center p-6 rounded-card border-2 border-dashed border-border hover:border-accent-primary hover:bg-accent-primary/5 transition-all gap-2 group">
+            <Link href="/brand/campaigns/new" className="flex flex-col items-center justify-center p-6 rounded-card border-2 border-dashed border-border hover:border-accent-primary hover:bg-accent-primary/5 transition-all gap-2 group">
               <div className="w-10 h-10 rounded-full bg-accent-primary/10 flex items-center justify-center group-hover:bg-accent-primary/20 transition-colors">
                 <Megaphone className="h-5 w-5 text-accent-primary" />
               </div>
               <span className="text-sm font-medium">New Campaign</span>
-            </button>
-            <button className="flex flex-col items-center justify-center p-6 rounded-card border-2 border-dashed border-border hover:border-accent-secondary hover:bg-accent-secondary/5 transition-all gap-2 group">
+            </Link>
+            <Link href="/brand/waybills" className="flex flex-col items-center justify-center p-6 rounded-card border-2 border-dashed border-border hover:border-accent-secondary hover:bg-accent-secondary/5 transition-all gap-2 group">
               <div className="w-10 h-10 rounded-full bg-accent-secondary/10 flex items-center justify-center group-hover:bg-accent-secondary/20 transition-colors">
                 <Truck className="h-5 w-5 text-accent-secondary" />
               </div>
               <span className="text-sm font-medium">Generate Waybills</span>
-            </button>
+            </Link>
           </CardContent>
         </Card>
       </div>
     </div>
   );
 }
-
-// Helper function not imported
-import { cn } from "@/lib/utils";
-import { Truck } from "lucide-react";

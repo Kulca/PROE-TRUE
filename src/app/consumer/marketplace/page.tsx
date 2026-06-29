@@ -1,11 +1,14 @@
 "use client";
 
 import * as React from "react";
+import { useSession } from "next-auth/react";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Search, Filter, MapPin, Package, ShieldCheck, Star } from "lucide-react";
+import { Search, MapPin, Package, ShieldCheck, Star } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import BillboardCarousel from "@/components/shared/billboard-carousel";
@@ -18,58 +21,93 @@ const FILTERS: { key: FilterTab; label: string }[] = [
   { key: "featured", label: "Featured" },
 ];
 
-interface Campaign {
-  id: string;
-  title: string;
-  brand: string;
-  brand_is_verified: boolean;
-  category: string;
-  size: string;
+const CATEGORY_LABELS: Record<string, string> = {
+  new_launch: "New Launch",
+  clearance: "Clearance",
+  out_of_season: "Out of Season",
+  odd_sizing: "Odd Sizing",
+  closing_down: "Closing Down",
+};
+
+interface Locker {
+  _id: string;
+  name: string;
+  address: string;
   province: string;
-  description: string;
-  image: string;
-  is_featured: boolean;
 }
-
-const CAMPAIGNS: Campaign[] = [
-  { id: "1", title: "Summer Skincare Trial Kit", brand: "Glow Beauty", brand_is_verified: true, category: "New Launch", size: "XS", province: "Gauteng", description: "Experience our new 3-step skincare routine for a glowing summer skin. Includes cleanser, toner, and moisturizer.", image: "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=800&auto=format&fit=crop&q=60", is_featured: true },
-  { id: "2", title: "Organic Almond Energy Bar", brand: "Pure Bites", brand_is_verified: false, category: "Clearance", size: "S", province: "Western Cape", description: "A perfect snack for your morning hikes. Made with 100% organic almonds and honey.", image: "https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?w=800&auto=format&fit=crop&q=60", is_featured: false },
-  { id: "3", title: "Premium Arabica Coffee Pods", brand: "Roast Master", brand_is_verified: true, category: "Out of Season", size: "M", province: "KwaZulu-Natal", description: "Taste the rich flavors of our limited edition winter roast. Compatible with all Nespresso machines.", image: "https://images.unsplash.com/photo-1559056199-641a0ac8b55e?w=800&auto=format&fit=crop&q=60", is_featured: false },
-  { id: "4", title: "Bamboo Fiber Kitchen Towels", brand: "EcoHome", brand_is_verified: true, category: "Odd Sizing", size: "L", province: "Eastern Cape", description: "Highly absorbent and sustainable kitchen towels made from natural bamboo fibers.", image: "https://images.unsplash.com/photo-1610348725531-843dff563e2c?w=800&auto=format&fit=crop&q=60", is_featured: true },
-];
-
-// Billboard slides (opted-in campaigns)
-const BILLBOARD_SLIDES = [
-  { id: "1", campaign_title: "Summer Skincare Trial Kit", brand_name: "Glow Beauty", campaign_story: "We've spent 18 months perfecting our new summer range. Free to the first 100 testers across SA — tell us what you think!", category: "New Launch" },
-  { id: "4", campaign_title: "Bamboo Kitchen Towels", brand_name: "EcoHome", campaign_story: "Sustainable living shouldn't cost more. Try our bamboo towels free and see the difference.", category: "Odd Sizing" },
-];
-
-const BILLBOARD_MID = [
-  { id: "2", campaign_title: "Clearance: Almond Energy Bars", brand_name: "Pure Bites", campaign_story: "Final batch — best-before approaching. Still delicious, just not shelf-stable for much longer.", category: "Clearance" },
-];
 
 export default function MarketplacePage() {
   const { toast } = useToast();
-  const [selectedCampaign, setSelectedCampaign] = React.useState<Campaign | null>(null);
+  const { data: session } = useSession();
+  const userId = (session?.user as any)?.id;
+
+  const campaigns = useQuery(api.campaigns.list, {}) ?? [];
+  const billboardSlides = useQuery(api.admin.listBillboardCampaigns, {}) ?? [];
+  const lockers = useQuery(api.pudo.listLockers, {}) ?? [];
+  const createClaim = useMutation(api.claims.create);
+
+  const [selectedCampaign, setSelectedCampaign] = React.useState<any>(null);
   const [isClaiming, setIsClaiming] = React.useState(false);
   const [filterTab, setFilterTab] = React.useState<FilterTab>("all");
   const [search, setSearch] = React.useState("");
+  const [selectedLockerId, setSelectedLockerId] = React.useState<string>("");
+  const [showLockerPicker, setShowLockerPicker] = React.useState(false);
 
-  const filtered = CAMPAIGNS.filter((c) => {
-    if (filterTab === "verified" && !c.brand_is_verified) return false;
-    if (filterTab === "featured" && !c.is_featured) return false;
-    if (search && !c.title.toLowerCase().includes(search.toLowerCase()) && !c.brand.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  });
+  const filtered = React.useMemo(() => {
+    return campaigns.filter((c: any) => {
+      if (filterTab === "featured" && !c.is_featured) return false;
+      if (search && !c.title.toLowerCase().includes(search.toLowerCase())) return false;
+      return true;
+    });
+  }, [campaigns, filterTab, search]);
 
-  const handleClaim = () => {
+  const heroBillboard = React.useMemo(() => {
+    return billboardSlides.map((c: any) => ({
+      id: c._id,
+      campaign_title: c.title,
+      brand_name: "Featured Brand",
+      campaign_story: c.campaign_story ?? "",
+      category: CATEGORY_LABELS[c.category] ?? c.category,
+    }));
+  }, [billboardSlides]);
+
+  const handleClaim = async () => {
+    if (!selectedCampaign || !userId) {
+      toast("error", "Please sign in to claim a sample.");
+      return;
+    }
+    if (!selectedLockerId) {
+      toast("error", "Please select a PUDO locker for pickup.");
+      return;
+    }
     setIsClaiming(true);
-    setTimeout(() => {
-      setIsClaiming(false);
-      setSelectedCampaign(null);
+    try {
+      await createClaim({
+        user_id: userId,
+        campaign_id: selectedCampaign._id,
+        selected_locker_id: selectedLockerId,
+        agree_to_survey_lock: true,
+      });
       toast("success", "Sample claimed successfully! Check My Claims for details.");
-    }, 1500);
+      setSelectedCampaign(null);
+      setSelectedLockerId("");
+    } catch (err: any) {
+      toast("error", err.message ?? "Failed to claim sample. Please try again.");
+    } finally {
+      setIsClaiming(false);
+    }
   };
+
+  const selectedLocker = lockers.find((l: any) => l._id === selectedLockerId) as Locker | undefined;
+
+  const groupLockersByProvince = React.useMemo(() => {
+    const groups: Record<string, Locker[]> = {};
+    for (const l of lockers as Locker[]) {
+      if (!groups[l.province]) groups[l.province] = [];
+      groups[l.province].push(l);
+    }
+    return groups;
+  }, [lockers]);
 
   return (
     <div className="space-y-8 animate-page">
@@ -79,7 +117,9 @@ export default function MarketplacePage() {
       </div>
 
       {/* Hero Billboard Carousel */}
-      <BillboardCarousel slides={BILLBOARD_SLIDES} size="hero" autoRotate autoRotateInterval={6000} />
+      {heroBillboard.length > 0 && (
+        <BillboardCarousel slides={heroBillboard} size="hero" autoRotate autoRotateInterval={6000} />
+      )}
 
       {/* Sticky Filter Bar */}
       <div className="sticky top-0 z-20 bg-bg-primary/95 backdrop-blur-sm border-b border-border py-4 space-y-4">
@@ -106,47 +146,47 @@ export default function MarketplacePage() {
         </div>
       </div>
 
-      {/* Mid Billboard Carousel (between filters and grid) */}
-      {BILLBOARD_MID.length > 0 && filterTab === "all" && (
-        <BillboardCarousel slides={BILLBOARD_MID} size="mid" autoRotate autoRotateInterval={8000} />
+      {/* Mid Billboard Carousel */}
+      {heroBillboard.length > 0 && filterTab === "all" && (
+        <BillboardCarousel slides={heroBillboard} size="mid" autoRotate autoRotateInterval={8000} />
       )}
 
       {/* Campaign Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filtered.map((campaign) => (
-          <Card key={campaign.id} className="group cursor-pointer overflow-hidden flex flex-col h-full" onClick={() => setSelectedCampaign(campaign)}>
+        {filtered.map((campaign: any) => (
+          <Card key={campaign._id} className="group cursor-pointer overflow-hidden flex flex-col h-full" onClick={() => setSelectedCampaign(campaign)}>
             <div className="aspect-[3/2] overflow-hidden bg-bg-secondary relative">
-              <img
-                src={campaign.image}
-                alt={campaign.title}
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-              />
-              <div className="absolute top-3 left-3 flex gap-2">
-                <Badge variant="accent">{campaign.category}</Badge>
-                {campaign.is_featured && <Badge variant="warning"><Star className="h-3 w-3 mr-0.5" />Featured</Badge>}
-              </div>
-              {campaign.brand_is_verified && (
-                <div className="absolute top-3 right-3">
-                  <ShieldCheck className="h-5 w-5 text-accent-primary fill-accent-primary/20" />
+              {campaign.image_url ? (
+                <img
+                  src={campaign.image_url}
+                  alt={campaign.title}
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-text-muted text-sm">
+                  No image
                 </div>
               )}
+              <div className="absolute top-3 left-3 flex gap-2">
+                <Badge variant="accent">{CATEGORY_LABELS[campaign.category] ?? campaign.category}</Badge>
+                {campaign.is_featured && <Badge variant="warning"><Star className="h-3 w-3 mr-0.5" />Featured</Badge>}
+              </div>
             </div>
             <CardContent className="p-4 flex-1">
               <div className="flex flex-col gap-1">
-                <p className="text-xs font-medium text-accent-secondary uppercase tracking-wider flex items-center gap-1">
-                  {campaign.brand}
-                  {campaign.brand_is_verified && <ShieldCheck className="h-3 w-3 text-accent-primary" />}
+                <p className="text-xs font-medium text-accent-secondary uppercase tracking-wider">
+                  Brand
                 </p>
                 <h3 className="text-lg font-serif text-text-primary leading-tight line-clamp-2">{campaign.title}</h3>
               </div>
+              <p className="text-sm text-text-secondary line-clamp-2 mt-2">{campaign.description}</p>
               <div className="flex items-center gap-4 mt-4">
                 <div className="flex items-center gap-1.5 text-xs text-text-muted">
                   <Package className="h-3.5 w-3.5" />
-                  <span>Size {campaign.size}</span>
+                  <span>Size {campaign.pudo_box_size_required}</span>
                 </div>
                 <div className="flex items-center gap-1.5 text-xs text-text-muted">
-                  <MapPin className="h-3.5 w-3.5" />
-                  <span>{campaign.province}</span>
+                  <span>{campaign.inventory_count} left</span>
                 </div>
               </div>
             </CardContent>
@@ -167,27 +207,27 @@ export default function MarketplacePage() {
       )}
 
       {/* Footer Billboard */}
-      {filterTab === "all" && (
-        <BillboardCarousel slides={BILLBOARD_MID} size="footer" autoRotate={false} />
+      {heroBillboard.length > 0 && filterTab === "all" && (
+        <BillboardCarousel slides={heroBillboard} size="footer" autoRotate={false} />
       )}
 
       {/* Claim Modal */}
-      <Modal isOpen={!!selectedCampaign} onClose={() => setSelectedCampaign(null)} title="Claim Sample">
+      <Modal isOpen={!!selectedCampaign} onClose={() => { setSelectedCampaign(null); setShowLockerPicker(false); }} title="Claim Sample">
         {selectedCampaign && (
           <div className="space-y-6">
             <div className="flex gap-4">
-              <div className="w-24 h-24 rounded-card overflow-hidden shrink-0">
-                <img src={selectedCampaign.image} alt="" className="w-full h-full object-cover" />
+              <div className="w-24 h-24 rounded-card overflow-hidden shrink-0 bg-bg-secondary">
+                {selectedCampaign.image_url ? (
+                  <img src={selectedCampaign.image_url} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-text-muted text-xs">No img</div>
+                )}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <h4 className="font-serif text-lg leading-tight">{selectedCampaign.title}</h4>
-                  {selectedCampaign.brand_is_verified && <ShieldCheck className="h-4 w-4 text-accent-primary shrink-0" />}
-                </div>
-                <p className="text-sm text-text-muted mt-1">{selectedCampaign.brand}</p>
+                <h4 className="font-serif text-lg leading-tight">{selectedCampaign.title}</h4>
                 <div className="flex gap-2 mt-2">
-                  <Badge variant="secondary">{selectedCampaign.category}</Badge>
-                  <Badge variant="outline">{selectedCampaign.size}</Badge>
+                  <Badge variant="secondary">{CATEGORY_LABELS[selectedCampaign.category] ?? selectedCampaign.category}</Badge>
+                  <Badge variant="outline">{selectedCampaign.pudo_box_size_required}</Badge>
                   {selectedCampaign.is_featured && <Badge variant="warning"><Star className="h-3 w-3 mr-0.5" />Featured</Badge>}
                 </div>
               </div>
@@ -198,26 +238,66 @@ export default function MarketplacePage() {
               <p className="text-sm text-text-secondary leading-relaxed">{selectedCampaign.description}</p>
             </div>
 
+            {/* Locker Selection */}
             <div className="p-4 rounded-card bg-bg-secondary border border-border space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Pickup Location</span>
-                <span className="text-xs text-accent-primary font-medium">Change</span>
+                <button
+                  onClick={() => setShowLockerPicker(!showLockerPicker)}
+                  className="text-xs text-accent-primary font-medium hover:underline"
+                >
+                  {selectedLocker ? "Change" : "Select"}
+                </button>
               </div>
-              <div className="flex items-start gap-3 text-text-secondary">
-                <MapPin className="h-4 w-4 mt-0.5 text-accent-primary" />
-                <div className="text-xs">
-                  <p className="font-medium text-text-primary">PUDO Locker: Rosebank Mall</p>
-                  <p>15A Cradock Ave, Rosebank, Johannesburg, 2196</p>
+              {selectedLocker ? (
+                <div className="flex items-start gap-3 text-text-secondary">
+                  <MapPin className="h-4 w-4 mt-0.5 text-accent-primary" />
+                  <div className="text-xs">
+                    <p className="font-medium text-text-primary">{selectedLocker.name}</p>
+                    <p>{selectedLocker.address}</p>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <p className="text-xs text-text-muted">Select a PUDO locker near you</p>
+              )}
+
+              {showLockerPicker && (
+                <div className="max-h-48 overflow-y-auto space-y-1 border-t border-border pt-3">
+                  {Object.entries(groupLockersByProvince).map(([province, lockerList]) => (
+                    <div key={province}>
+                      <p className="text-[10px] font-bold uppercase text-text-muted tracking-wider mb-1 px-1">{province}</p>
+                      {lockerList.map((locker) => (
+                        <button
+                          key={locker._id}
+                          onClick={() => { setSelectedLockerId(locker._id); setShowLockerPicker(false); }}
+                          className={`w-full text-left px-3 py-2 rounded-subtle text-xs transition-colors ${
+                            selectedLockerId === locker._id
+                              ? "bg-accent-primary/10 text-accent-primary"
+                              : "hover:bg-bg-primary text-text-secondary"
+                          }`}
+                        >
+                          <span className="font-medium">{locker.name}</span>
+                          <span className="text-text-muted ml-1">— {locker.address}</span>
+                        </button>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="space-y-3">
               <p className="text-[10px] text-text-muted italic">
                 By claiming this sample, you agree to complete a short survey within 48 hours of collection. Subsequent claims will be locked until the survey is submitted.
               </p>
-              <Button className="w-full" size="lg" onClick={handleClaim} isLoading={isClaiming}>
-                Confirm Claim
+              <Button
+                className="w-full"
+                size="lg"
+                onClick={handleClaim}
+                isLoading={isClaiming}
+                disabled={!selectedLockerId || !userId}
+              >
+                {!userId ? "Sign in to Claim" : !selectedLockerId ? "Select a Locker" : "Confirm Claim"}
               </Button>
             </div>
           </div>

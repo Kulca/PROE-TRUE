@@ -2,6 +2,9 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +15,10 @@ import { useToast } from "@/components/ui/toast";
 export default function NewCampaignPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const { data: session } = useSession();
+  const userId = (session?.user as any)?.id;
+
+  const createCampaign = useMutation(api.campaigns.create);
   const [isLoading, setIsLoading] = React.useState(false);
 
   const categories = [
@@ -32,14 +39,54 @@ export default function NewCampaignPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!userId) {
+      toast("error", "Please sign in to create a campaign.");
+      return;
+    }
+
+    const form = e.target as HTMLFormElement;
+    const formData = new FormData(form);
+    const title = formData.get("title") as string;
+    const description = formData.get("description") as string;
+    const category = formData.get("category") as string;
+    const inventoryCount = parseInt(formData.get("inventoryCount") as string, 10);
+    const boxSize = formData.get("boxSize") as string;
+    const campaignStory = formData.get("campaignStory") as string;
+    const billboardOptIn = formData.get("billboardOptIn") === "on";
+
+    if (!title || !description || !category || !inventoryCount || !boxSize) {
+      toast("error", "Please fill in all required fields.");
+      return;
+    }
+
     setIsLoading(true);
-    // Mock campaign creation
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      await createCampaign({
+        brand_id: userId,
+        title,
+        description,
+        category: category as any,
+        inventory_count: inventoryCount,
+        pudo_box_size_required: boxSize as any,
+        image_url: undefined,
+      });
       toast("success", "Campaign created successfully!");
       router.push("/brand/campaigns");
-    }, 1500);
+    } catch (err: any) {
+      toast("error", err.message ?? "Failed to create campaign.");
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  if (!userId) {
+    return (
+      <div className="space-y-8 animate-page">
+        <h1 className="text-3xl font-serif text-text-primary">New Campaign</h1>
+        <p className="text-text-secondary">Please sign in to create a campaign.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 animate-page">
@@ -63,11 +110,17 @@ export default function NewCampaignPage() {
               <CardDescription>Give your campaign a title and description that will appeal to testers.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <Input label="Campaign Title" placeholder="e.g. Summer Skincare Trial Kit" required />
-              
+              <Input
+                label="Campaign Title"
+                name="title"
+                placeholder="e.g. Summer Skincare Trial Kit"
+                required
+              />
+
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-text-secondary">Description</label>
-                <textarea 
+                <textarea
+                  name="description"
                   className="flex min-h-[120px] w-full rounded-subtle border border-border bg-white px-3 py-2 text-sm placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary focus-visible:border-accent-primary disabled:cursor-not-allowed disabled:opacity-50 transition-all"
                   placeholder="Tell testers about what they're getting and why you're sharing it..."
                   required
@@ -77,13 +130,25 @@ export default function NewCampaignPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium text-text-secondary">Category</label>
-                  <select className="flex h-11 w-full rounded-subtle border border-border bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary focus-visible:border-accent-primary">
+                  <select
+                    name="category"
+                    className="flex h-11 w-full rounded-subtle border border-border bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary focus-visible:border-accent-primary"
+                    required
+                  >
+                    <option value="">Select category</option>
                     {categories.map((c) => (
                       <option key={c.value} value={c.value}>{c.label}</option>
                     ))}
                   </select>
                 </div>
-                <Input label="Inventory Count" type="number" placeholder="500" min="1" required />
+                <Input
+                  label="Inventory Count"
+                  name="inventoryCount"
+                  type="number"
+                  placeholder="500"
+                  min="1"
+                  required
+                />
               </div>
 
               <div className="space-y-3">
@@ -107,6 +172,7 @@ export default function NewCampaignPage() {
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-text-secondary">Campaign Story (for Billboard)</label>
                 <textarea
+                  name="campaignStory"
                   className="flex min-h-[80px] w-full rounded-subtle border border-border bg-white px-3 py-2 text-sm placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary focus-visible:border-accent-primary"
                   placeholder="Tell your brand story or why you're offering this freebie. This may appear in the billboard carousel..."
                 />
@@ -119,7 +185,7 @@ export default function NewCampaignPage() {
                     <label className="text-sm font-medium text-text-primary">Opt-in for Billboard Placement</label>
                     <p className="text-xs text-text-muted">Get your campaign featured in the SA marketplace hero carousel. Requires a campaign story above.</p>
                   </div>
-                  <input type="checkbox" name="billboard_opt_in" className="accent-accent-primary w-5 h-5" />
+                  <input type="checkbox" name="billboardOptIn" className="accent-accent-primary w-5 h-5" />
                 </div>
               </div>
             </CardContent>

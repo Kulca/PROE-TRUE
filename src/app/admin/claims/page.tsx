@@ -1,16 +1,11 @@
 "use client";
 
 import * as React from "react";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import { Badge } from "@/components/ui/badge";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
-
-const MOCK_CLAIMS = [
-  { id: "1", user: "Nomvuso Dlamini", campaign: "Summer Skincare Trial Kit", status: "collected", locker: "Rosebank Mall", createdAt: "2024-03-20" },
-  { id: "2", user: "Amara Singh", campaign: "Chai Latte Blend", status: "in_transit", locker: "Sandton City", createdAt: "2024-03-21" },
-  { id: "3", user: "Johan Smith", campaign: "Mango Chutney Pack", status: "ready_for_pickup", locker: "Century City", createdAt: "2024-03-22" },
-  { id: "4", user: "Lisa van Wyk", campaign: "Biltong Spice Mix", status: "pending", locker: "Brooklyn Mall", createdAt: "2024-03-23" },
-];
 
 const STATUS_COLORS: Record<string, "secondary" | "warning" | "accent" | "error"> = {
   pending: "warning",
@@ -21,9 +16,13 @@ const STATUS_COLORS: Record<string, "secondary" | "warning" | "accent" | "error"
 
 export default function AdminClaimsPage() {
   const [search, setSearch] = React.useState("");
-  const claims = MOCK_CLAIMS.filter((c) =>
-    !search || c.user.toLowerCase().includes(search.toLowerCase()) || c.campaign.toLowerCase().includes(search.toLowerCase())
-  );
+  const claims = useQuery(api.admin.listAllClaims, {}) ?? [];
+
+  const filtered = claims.filter((c: any) => {
+    const id = c._id.toLowerCase();
+    const query = search.toLowerCase();
+    return !search || id.includes(query);
+  });
 
   return (
     <div className="space-y-6">
@@ -37,34 +36,50 @@ export default function AdminClaimsPage() {
         <Input placeholder="Search claims..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10 max-w-md" />
       </div>
 
+      {claims.length === 0 && (
+        <div className="text-center py-16">
+          <p className="text-text-muted">No claims yet.</p>
+        </div>
+      )}
+
       <div className="rounded-card border border-border overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-bg-secondary border-b border-border">
             <tr>
-              <th className="text-left px-4 py-3 font-medium text-text-muted">User</th>
+              <th className="text-left px-4 py-3 font-medium text-text-muted">Claim ID</th>
               <th className="text-left px-4 py-3 font-medium text-text-muted">Campaign</th>
-              <th className="text-left px-4 py-3 font-medium text-text-muted">Locker</th>
               <th className="text-left px-4 py-3 font-medium text-text-muted">Status</th>
+              <th className="text-left px-4 py-3 font-medium text-text-muted">Tracking</th>
               <th className="text-left px-4 py-3 font-medium text-text-muted">Date</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {claims.map((claim) => (
-              <tr key={claim.id} className="hover:bg-bg-secondary/50 transition-colors">
-                <td className="px-4 py-3 font-medium text-text-primary">{claim.user}</td>
-                <td className="px-4 py-3 text-text-secondary">{claim.campaign}</td>
-                <td className="px-4 py-3 text-text-secondary">{claim.locker}</td>
+            {filtered.map((claim: any) => (
+              <tr key={claim._id} className="hover:bg-bg-secondary/50 transition-colors">
+                <td className="px-4 py-3 font-medium text-text-primary font-mono text-xs">
+                  {claim._id.slice(0, 10)}...
+                </td>
+                <td className="px-4 py-3 text-text-secondary">
+                  {claim.campaign_id?.slice(0, 10) ?? "—"}...
+                </td>
                 <td className="px-4 py-3">
-                  <Badge variant={STATUS_COLORS[claim.status] || "secondary"}>
-                    {claim.status.replace(/_/g, " ")}
+                  <Badge variant={STATUS_COLORS[claim.shipping_status] || "secondary"}>
+                    {claim.shipping_status?.replace(/_/g, " ")}
                   </Badge>
                 </td>
-                <td className="px-4 py-3 text-text-muted text-xs">{claim.createdAt}</td>
+                <td className="px-4 py-3 text-text-secondary font-mono text-xs">
+                  {claim.pudo_tracking_number ?? "—"}
+                </td>
+                <td className="px-4 py-3 text-text-muted text-xs">
+                  {claim.createdAt ? new Date(claim.createdAt).toLocaleDateString("en-ZA") : "—"}
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
-        {claims.length === 0 && <div className="p-8 text-center text-text-muted text-sm">No claims found.</div>}
+        {filtered.length === 0 && claims.length > 0 && (
+          <div className="p-8 text-center text-text-muted text-sm">No claims match your search.</div>
+        )}
       </div>
     </div>
   );

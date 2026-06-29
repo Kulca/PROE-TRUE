@@ -1,6 +1,9 @@
 "use client";
 
 import * as React from "react";
+import { useSession } from "next-auth/react";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,35 +17,7 @@ import {
   AlertCircle,
   ChevronRight,
 } from "lucide-react";
-
-const COMMISSION_PER_CLAIM = 5;
-const PREMIUM_PRICE_ZAR = 99;
-const MIN_PAYOUT_ZAR = 100;
-
-// ── Mock data — wire to Convex queries in production ──
-const mockSubscription = {
-  tier: "free" as const,
-  status: "active" as const,
-  current_period_end: Date.now() + 15 * 24 * 60 * 60 * 1000,
-};
-
-const mockBalance = {
-  balance_zar: 240,
-  pending_commission_zar: 0,
-};
-
-const mockTransactions = [
-  { id: "1", type: "commission_charged" as const, amount_zar: -5, description: "Commission — claim #1042", createdAt: Date.now() - 1 * 24 * 60 * 60 * 1000 },
-  { id: "2", type: "commission_charged" as const, amount_zar: -5, description: "Commission — claim #1041", createdAt: Date.now() - 2 * 24 * 60 * 60 * 1000 },
-  { id: "3", type: "topup" as const, amount_zar: 500, description: "Funds added", createdAt: Date.now() - 5 * 24 * 60 * 60 * 1000 },
-  { id: "4", type: "payout" as const, amount_zar: -250, description: "Payout processed", createdAt: Date.now() - 7 * 24 * 60 * 60 * 1000 },
-  { id: "5", type: "commission_charged" as const, amount_zar: -5, description: "Commission — claim #1040", createdAt: Date.now() - 10 * 24 * 60 * 60 * 1000 },
-];
-
-const mockInvoices = [
-  { id: "inv1", amount_zar: 99, status: "paid" as const, description: "Proe Premium — Monthly", paid_at: Date.now() - 30 * 24 * 60 * 60 * 1000 },
-  { id: "inv2", amount_zar: 99, status: "paid" as const, description: "Proe Premium — Monthly", paid_at: Date.now() - 60 * 24 * 60 * 60 * 1000 },
-];
+import { useToast } from "@/components/ui/toast";
 
 function formatZar(amount: number) {
   return `R${Math.abs(amount).toFixed(2)}`;
@@ -63,63 +38,91 @@ function TierBadge({ tier, status }: { tier: string; status: string }) {
 }
 
 export default function BrandBillingPage() {
+  const { toast } = useToast();
+  const { data: session } = useSession();
+  const userId = (session?.user as any)?.id;
+
+  const billingSummary = useQuery(
+    api.billing.getBrandBillingSummary,
+    userId ? { brand_id: userId } : "skip"
+  );
+  const requestPayout = useMutation(api.billing.requestPayout);
+
   const [loadingUpgrade, setLoadingUpgrade] = React.useState(false);
   const [loadingPayout, setLoadingPayout] = React.useState(false);
   const [showPayoutForm, setShowPayoutForm] = React.useState(false);
   const [payoutAmount, setPayoutAmount] = React.useState("");
 
-  const sub = mockSubscription;
-  const balance = mockBalance;
-  const isPremium = sub.tier === "premium";
-  const availableBalance = balance.balance_zar;
-  const canPayout = availableBalance >= MIN_PAYOUT_ZAR;
+  const sub = billingSummary?.subscription;
+  const balance = billingSummary?.balance;
+  const isPremium = sub?.tier === "premium";
+  const availableBalance = balance?.balance_zar ?? 0;
+  const minPayout = billingSummary?.minPayout ?? 100;
+  const canPayout = availableBalance >= minPayout;
 
   const handleUpgrade = async () => {
+    if (!userId) return;
     setLoadingUpgrade(true);
-    // Wire to Convex subscribePremium mutation + PayU redirect
-    await new Promise((r) => setTimeout(r, 1500));
+    // In a real implementation, this would redirect to PayU checkout
+    toast("info", "Premium upgrade requires PayU setup. Coming soon.");
     setLoadingUpgrade(false);
   };
 
   const handlePayout = async () => {
     const amt = parseFloat(payoutAmount);
-    if (!amt || amt < MIN_PAYOUT_ZAR) return;
+    if (!amt || amt < minPayout || !userId) return;
     setLoadingPayout(true);
-    // Wire to Convex requestPayout mutation
-    await new Promise((r) => setTimeout(r, 1500));
-    setLoadingPayout(false);
-    setShowPayoutForm(false);
-    setPayoutAmount("");
+    try {
+      await requestPayout({
+        brand_id: userId,
+        amount_zar: amt,
+        bank_account: "Standard Bank •• 1234", // Placeholder — real flow collects bank details
+      });
+      toast("success", `Payout of ${formatZar(amt)} requested successfully.`);
+      setShowPayoutForm(false);
+      setPayoutAmount("");
+    } catch (err: any) {
+      toast("error", err.message ?? "Payout request failed.");
+    } finally {
+      setLoadingPayout(false);
+    }
   };
+
+  if (!userId) {
+    return (
+      <div className="space-y-8 animate-page">
+        <h1 className="text-3xl font-serif text-text-primary">Billing &amp; Subscription</h1>
+        <p className="text-text-secondary">Please sign in to manage billing.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 animate-page">
-      {/* Header */}
       <div className="flex flex-col gap-1">
         <h1 className="text-3xl font-serif text-text-primary">Billing &amp; Subscription</h1>
         <p className="text-text-secondary">Manage your plan, balance, and payout requests.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: Subscription + Balance */}
         <div className="lg:col-span-2 space-y-6">
           {/* Current Plan */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg font-serif">Current Plan</CardTitle>
-                <TierBadge tier={sub.tier} status={sub.status} />
+                <TierBadge tier={sub?.tier ?? "free"} status={sub?.status ?? "active"} />
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
               {isPremium ? (
                 <div className="space-y-3">
                   <div className="flex items-baseline gap-2">
-                    <span className="text-4xl font-bold text-text-primary">R{PREMIUM_PRICE_ZAR}</span>
+                    <span className="text-4xl font-bold text-text-primary">R{(billingSummary as any)?.premiumPrice ?? 99}</span>
                     <span className="text-text-muted">/month</span>
                   </div>
                   <p className="text-sm text-text-secondary">
-                    Your Premium plan renews on {formatDate(sub.current_period_end)}.
+                    Your Premium plan renews on {sub?.current_period_end ? formatDate(sub.current_period_end) : "N/A"}.
                     No commission on claims. Unlimited campaigns.
                   </p>
                   <div className="flex gap-3 flex-wrap">
@@ -140,13 +143,13 @@ export default function BrandBillingPage() {
                     <span className="text-4xl font-bold text-text-primary">Free</span>
                   </div>
                   <p className="text-sm text-text-secondary">
-                    R{COMMISSION_PER_CLAIM} commission charged per collected claim.
+                    R{billingSummary?.commissionPerClaim ?? 5} commission charged per collected claim.
                     Upgrade to Premium to eliminate commission and unlock unlimited claims.
                   </p>
                   <div className="flex gap-3 flex-wrap">
                     <div className="flex items-center gap-1.5 text-sm text-text-secondary">
                       <Zap className="w-4 h-4 text-amber-500" />{" "}
-                      {COMMISSION_PER_CLAIM}/claim commission
+                      {billingSummary?.commissionPerClaim ?? 5}/claim commission
                     </div>
                     <div className="flex items-center gap-1.5 text-sm text-text-secondary">
                       <AlertCircle className="w-4 h-4 text-amber-500" /> 50 active claims/month
@@ -158,7 +161,7 @@ export default function BrandBillingPage() {
                     className="bg-amber-500 hover:bg-amber-600 text-white"
                   >
                     <Zap className="w-4 h-4 mr-2" />
-                    Upgrade to Premium — R{PREMIUM_PRICE_ZAR}/mo
+                    Upgrade to Premium — R{billingSummary?.premiumPrice ?? 99}/mo
                   </Button>
                 </div>
               )}
@@ -181,7 +184,7 @@ export default function BrandBillingPage() {
                 <div className="bg-slate-50 rounded-xl p-4">
                   <p className="text-sm text-text-muted mb-1">Pending Commission</p>
                   <p className="text-2xl font-bold text-text-primary">
-                    {formatZar(balance.pending_commission_zar)}
+                    {formatZar(balance?.pending_commission_zar ?? 0)}
                   </p>
                 </div>
               </div>
@@ -195,7 +198,7 @@ export default function BrandBillingPage() {
                         Commission being deducted per collected claim
                       </p>
                       <p className="text-sm text-amber-700 mt-0.5">
-                        Upgrade to Premium to stop paying {COMMISSION_PER_CLAIM}/claim and keep your full balance.
+                        Upgrade to Premium to stop paying {billingSummary?.commissionPerClaim ?? 5}/claim and keep your full balance.
                       </p>
                     </div>
                   </div>
@@ -209,17 +212,17 @@ export default function BrandBillingPage() {
                   <div className="flex gap-2">
                     <input
                       type="number"
-                      min={MIN_PAYOUT_ZAR}
+                      min={minPayout}
                       max={availableBalance}
                       value={payoutAmount}
                       onChange={(e) => setPayoutAmount(e.target.value)}
-                      placeholder={`Min R${MIN_PAYOUT_ZAR}`}
+                      placeholder={`Min R${minPayout}`}
                       className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
                     />
                     <Button
                       onClick={handlePayout}
                       loading={loadingPayout}
-                      disabled={!payoutAmount || parseFloat(payoutAmount) < MIN_PAYOUT_ZAR}
+                      disabled={!payoutAmount || parseFloat(payoutAmount) < minPayout}
                     >
                       Request
                     </Button>
@@ -228,7 +231,7 @@ export default function BrandBillingPage() {
                     </Button>
                   </div>
                   <p className="text-xs text-text-muted">
-                    Payouts processed via PayU EFT. Minimum: R{MIN_PAYOUT_ZAR}.
+                    Payouts processed via PayU EFT. Minimum: R{minPayout}.
                   </p>
                 </div>
               ) : (
@@ -241,7 +244,7 @@ export default function BrandBillingPage() {
                   <CreditCard className="w-4 h-4 mr-2" />
                   Request Payout
                   {!canPayout && (
-                    <span className="ml-2 text-xs text-text-muted">(min R{MIN_PAYOUT_ZAR})</span>
+                    <span className="ml-2 text-xs text-text-muted">(min R{minPayout})</span>
                   )}
                 </Button>
               )}
@@ -255,43 +258,46 @@ export default function BrandBillingPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {mockTransactions.map((tx) => (
-                  <div key={tx.id} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                        tx.type === "commission_charged" ? "bg-red-50" :
-                        tx.type === "payout" ? "bg-blue-50" :
-                        tx.type === "topup" ? "bg-green-50" :
-                        "bg-slate-50"
+                {!billingSummary?.recentTransactions || billingSummary.recentTransactions.length === 0 ? (
+                  <p className="text-sm text-text-muted text-center py-4">No transactions yet.</p>
+                ) : (
+                  billingSummary.recentTransactions.map((tx: any) => (
+                    <div key={tx._id} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                          tx.type === "commission_charged" ? "bg-red-50" :
+                          tx.type === "payout" ? "bg-blue-50" :
+                          tx.type === "topup" ? "bg-green-50" :
+                          "bg-slate-50"
+                        }`}>
+                          {tx.type === "commission_charged" ? (
+                            <TrendingDown className="w-4 h-4 text-red-500" />
+                          ) : tx.type === "payout" ? (
+                            <ArrowUpRight className="w-4 h-4 text-blue-500" />
+                          ) : tx.type === "topup" ? (
+                            <ArrowUpRight className="w-4 h-4 text-green-500" />
+                          ) : (
+                            <CreditCard className="w-4 h-4 text-slate-500" />
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-text-primary">{tx.description}</p>
+                          <p className="text-xs text-text-muted">{formatDate(tx.createdAt)}</p>
+                        </div>
+                      </div>
+                      <span className={`text-sm font-semibold ${
+                        tx.amount_zar < 0 ? "text-red-600" : "text-green-600"
                       }`}>
-                        {tx.type === "commission_charged" ? (
-                          <TrendingDown className="w-4 h-4 text-red-500" />
-                        ) : tx.type === "payout" ? (
-                          <ArrowUpRight className="w-4 h-4 text-blue-500" />
-                        ) : tx.type === "topup" ? (
-                          <ArrowUpRight className="w-4 h-4 text-green-500" />
-                        ) : (
-                          <CreditCard className="w-4 h-4 text-slate-500" />
-                        )}
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-text-primary">{tx.description}</p>
-                        <p className="text-xs text-text-muted">{formatDate(tx.createdAt)}</p>
-                      </div>
+                        {tx.amount_zar < 0 ? "-" : "+"}{formatZar(tx.amount_zar)}
+                      </span>
                     </div>
-                    <span className={`text-sm font-semibold ${
-                      tx.amount_zar < 0 ? "text-red-600" : "text-green-600"
-                    }`}>
-                      {tx.amount_zar < 0 ? "-" : "+"}{formatZar(tx.amount_zar)}
-                    </span>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Right: Quick actions + invoices */}
         <div className="space-y-6">
           {/* Premium upgrade card */}
           {!isPremium && (
@@ -308,7 +314,7 @@ export default function BrandBillingPage() {
                   <p>✓ Full analytics access</p>
                 </div>
                 <div className="pt-2 border-t border-amber-200">
-                  <p className="text-2xl font-bold text-amber-900">R{PREMIUM_PRICE_ZAR}<span className="text-sm font-normal">/month</span></p>
+                  <p className="text-2xl font-bold text-amber-900">R{billingSummary?.premiumPrice ?? 99}<span className="text-sm font-normal">/month</span></p>
                 </div>
                 <Button
                   onClick={handleUpgrade}
@@ -330,20 +336,21 @@ export default function BrandBillingPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              {mockInvoices.map((inv) => (
-                <div key={inv.id} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-green-500" />
-                    <div>
-                      <p className="text-sm text-text-primary">{inv.description}</p>
-                      <p className="text-xs text-text-muted">{formatDate(inv.paid_at)}</p>
-                    </div>
-                  </div>
-                  <span className="text-sm font-semibold text-text-primary">R{inv.amount_zar}</span>
-                </div>
-              ))}
-              {mockInvoices.length === 0 && (
+              {!billingSummary?.recentInvoices || billingSummary.recentInvoices.length === 0 ? (
                 <p className="text-sm text-text-muted text-center py-4">No invoices yet.</p>
+              ) : (
+                billingSummary.recentInvoices.map((inv: any) => (
+                  <div key={inv._id} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      <div>
+                        <p className="text-sm text-text-primary">{inv.description}</p>
+                        <p className="text-xs text-text-muted">{inv.paid_at ? formatDate(inv.paid_at) : "Unpaid"}</p>
+                      </div>
+                    </div>
+                    <span className="text-sm font-semibold text-text-primary">R{inv.amount_zar}</span>
+                  </div>
+                ))
               )}
             </CardContent>
           </Card>

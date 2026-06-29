@@ -1,19 +1,18 @@
 "use client";
 
 import * as React from "react";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import { Card, CardContent } from "@/components/ui/card";
-import { Star, ThumbsUp } from "lucide-react";
-
-const MOCK_SURVEYS = [
-  { id: "1", campaign: "Summer Skincare Trial Kit", brand: "Glow Beauty", rating: 5, feedback: "Absolutely love this range! Will definitely purchase full size.", date: "2024-03-20" },
-  { id: "2", campaign: "Chai Latte Blend", brand: "Spice Route Co.", rating: 4, feedback: "Great flavor, packaging could be better.", date: "2024-03-21" },
-  { id: "3", campaign: "Mango Chutney Pack", brand: "Durban Flavours", rating: 5, feedback: "Perfect balance of sweet and tangy!", date: "2024-03-22" },
-  { id: "4", campaign: "Biltong Spice Mix", brand: "Safari Spices", rating: 3, feedback: "Good product but shipping took too long.", date: "2024-03-23" },
-  { id: "5", campaign: "Winter Beanie", brand: "JHB Knitwear", rating: 4, feedback: "Nice quality for the odd size.", date: "2024-03-24" },
-];
+import { Star } from "lucide-react";
 
 export default function AdminSurveysPage() {
-  const avgRating = (MOCK_SURVEYS.reduce((sum, s) => sum + s.rating, 0) / MOCK_SURVEYS.length).toFixed(1);
+  const surveys = useQuery(api.admin.listAllSurveys, {}) ?? [];
+
+  const avgRating = surveys.length > 0
+    ? (surveys.reduce((sum: number, s: any) => sum + s.ratings, 0) / surveys.length).toFixed(1)
+    : "0.0";
+
   return (
     <div className="space-y-6">
       <div>
@@ -23,9 +22,9 @@ export default function AdminSurveysPage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
-          { label: "Total Surveys", value: MOCK_SURVEYS.length },
+          { label: "Total Surveys", value: surveys.length },
           { label: "Average Rating", value: `${avgRating}/5` },
-          { label: "Would Recommend", value: `${Math.round((MOCK_SURVEYS.filter((s) => s.rating >= 4).length / MOCK_SURVEYS.length) * 100)}%` },
+          { label: "High Ratings (4+)", value: surveys.length > 0 ? `${Math.round((surveys.filter((s: any) => s.ratings >= 4).length / surveys.length) * 100)}%` : "0%" },
         ].map(({ label, value }) => (
           <Card key={label}>
             <CardContent className="p-6 text-center">
@@ -36,25 +35,35 @@ export default function AdminSurveysPage() {
         ))}
       </div>
 
+      {surveys.length === 0 && (
+        <div className="text-center py-16">
+          <p className="text-text-muted">No surveys yet.</p>
+        </div>
+      )}
+
       <div className="space-y-4">
-        {MOCK_SURVEYS.map((s) => (
-          <Card key={s.id}>
+        {surveys.map((s: any) => (
+          <Card key={s._id}>
             <CardContent className="p-6">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-serif text-text-primary">{s.campaign}</h3>
-                    <span className="text-xs text-text-muted">· {s.brand}</span>
+                    <h3 className="font-serif text-text-primary">Campaign Feedback</h3>
+                    <span className="text-xs text-text-muted">· {new Date(s.submitted_at).toLocaleDateString("en-ZA")}</span>
                   </div>
-                  <p className="text-sm text-text-secondary mt-2 leading-relaxed">"{s.feedback}"</p>
+                  {s.written_feedback && (
+                    <p className="text-sm text-text-secondary mt-2 leading-relaxed">"{s.written_feedback}"</p>
+                  )}
+                  {!s.written_feedback && (
+                    <p className="text-sm text-text-muted mt-2 italic">No written feedback</p>
+                  )}
                 </div>
                 <div className="text-right shrink-0">
                   <div className="flex items-center gap-1">
                     {Array.from({ length: 5 }).map((_, i) => (
-                      <Star key={i} className={`h-4 w-4 ${i < s.rating ? "text-warning fill-warning" : "text-border"}`} />
+                      <Star key={i} className={`h-4 w-4 ${i < s.ratings ? "text-warning fill-warning" : "text-border"}`} />
                     ))}
                   </div>
-                  <p className="text-xs text-text-muted mt-1">{s.date}</p>
                 </div>
               </div>
             </CardContent>
