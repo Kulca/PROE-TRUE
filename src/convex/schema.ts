@@ -40,10 +40,32 @@ export default defineSchema({
       manual_address: v.optional(v.string()),
     })),
     is_verified: v.boolean(),
+    email_verified: v.boolean(),
+    verification_token: v.optional(v.string()),
+    verification_token_expires: v.optional(v.number()),
+    avatar_storage_id: v.optional(v.id("_storage")),
     createdAt: v.number(),
-  }).index("by_email", ["email"])
+  })
+    .index("by_email", ["email"])
     .index("by_role", ["role"])
-    .index("by_verified", ["is_verified"]),
+    .index("by_verified", ["is_verified"])
+    .index("by_verification_token", ["verification_token"]),
+
+  sessions: defineTable({
+    token: v.string(),
+    user_id: v.id("users"),
+    expires_at: v.number(),
+  })
+    .index("by_token", ["token"])
+    .index("by_user", ["user_id"]),
+
+  email_verification_tokens: defineTable({
+    token: v.string(),
+    user_id: v.id("users"),
+    expires_at: v.number(),
+  })
+    .index("by_token", ["token"])
+    .index("by_user", ["user_id"]),
 
   campaigns: defineTable({
     brand_id: v.id("users"),
@@ -115,7 +137,7 @@ export default defineSchema({
       v.literal("past_due"),
       v.literal("trialing"),
     ),
-    provider: v.literal("payu"),
+    provider: v.literal("paystack"),
     provider_subscription_id: v.optional(v.string()),
     provider_customer_id: v.optional(v.string()),
     current_period_start: v.number(),
@@ -137,7 +159,7 @@ export default defineSchema({
       v.literal("failed"),
       v.literal("refunded"),
     ),
-    provider: v.literal("payu"),
+    provider: v.literal("paystack"),
     provider_invoice_id: v.optional(v.string()),
     description: v.string(),
     paid_at: v.optional(v.number()),
@@ -153,8 +175,7 @@ export default defineSchema({
     pending_commission_zar: v.number(),
     createdAt: v.number(),
     updatedAt: v.number(),
-  })
-    .index("by_brand", ["brand_id"]),
+  }).index("by_brand", ["brand_id"]),
 
   transactions: defineTable({
     brand_id: v.id("users"),
@@ -184,7 +205,7 @@ export default defineSchema({
       v.literal("completed"),
       v.literal("failed"),
     ),
-    provider: v.literal("payu"),
+    provider: v.literal("paystack"),
     provider_payout_id: v.optional(v.string()),
     bank_account: v.string(),
     requested_at: v.number(),
