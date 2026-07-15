@@ -1,60 +1,134 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import bcrypt from "bcryptjs";
+import { randomUUID } from "crypto";
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 const SALT_ROUNDS = 10;
+const EMAIL_VERIFY_TTL_MS = 24 * 60 * 60 * 1000;
+const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
-export const signUp = mutation({
+const toPublicUser = (user: any) => ({
+  _id: user._id,
+  name: user.name,
+  email: user.email,
+  role: user.role,
+  email_verified: user.email_verified,
+  avatar_storage_id: user.avatar_storage_id,
+  preferred_pudo_locker_id: user.preferred_pudo_locker_id,
+  pudo_locker_address: user.pudo_locker_address,
+  size_preferences: user.size_preferences,
+  createdAt: user.createdAt,
+});
+
+async function sendVerificationEmail(email: string, token: string) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    throw new Error("RESEND_API_KEY is not configured");
+  }
+
+  const appUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+  const verifyUrl = `${appUrl.replace(/\/$/, "")}/verify-email?token=${token}`;
+
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: "Proe <noreply@proe.co.za>",
+      to: email,
+      subject: "Verify your Proe account",
+      html: `Click <a href=\"${verifyUrl}\">here</a> to verify your email.`,
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Failed to send verification email: ${body}`);
+  }
+}
+
+export const register = mutation({
   args: {
     name: v.string(),
     email: v.string(),
-    password: v.optional(v.string()),
-    phone_number: v.optional(v.string()),
+    password: v.string(),
     role: v.union(v.literal("brand"), v.literal("consumer")),
-    size_preferences: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const email = normalizeEmail(args.email);
     const existingUser = await ctx.db
       .query("users")
-      .withIndex("by_email", (q: any) => q.eq("email", email))
+      .withIndex("by_email", (q) => q.eq("email", email))
       .unique();
 
     if (existingUser) {
       throw new Error("An account with this email already exists.");
     }
 
-    // Hash the password if provided
-    let hashedPassword: string | undefined;
-    if (args.password) {
-      hashedPassword = bcrypt.hashSync(args.password, SALT_ROUNDS);
-    }
+    const passwordHash = await bcrypt.hash(args.password, SALT_ROUNDS);
+    const verificationToken = randomUUID();
+    const expiresAt = Date.now() + EMAIL_VERIFY_TTL_MS;
 
     const userId = await ctx.db.insert("users", {
       name: args.name.trim(),
       email,
-      password: hashedPassword,
-      phone_number: args.phone_number,
+      password: passwordHash,
       role: args.role,
-      preferred_pudo_locker_id: undefined,
-      pudo_locker_address: undefined,
-      size_preferences: args.size_preferences,
+      is_verified: false,
+      email_verified: false,
+      verification_token: verificationToken,
+      verification_token_expires: expiresAt,
       createdAt: Date.now(),
     });
 
-    return {
-      userId,
-      role: args.role,
-      message: "Account created successfully",
-    };
+    await ctx.db.insert("email_verification_tokens", {
+      token: verificationToken,
+      user_id: userId,
+      expires_at: expiresAt,
+    });
+
+    await sendVerificationEmail(email, verificationToken);
+
+    return { success: true, userId };
   },
 });
 
-export const signIn = mutation({
+export const verifyEmail = mutation({
+  args: { token: v.string() },
+  handler: async (ctx, args) => {
+    const record = await ctx.db
+      .query("email_verification_tokens")
+      .withIndex("by_token", (q) => q.eq("token", args.token))
+      .first();
+
+    if (!record || record.expires_at < Date.now()) {
+      throw new Error("Verification token is invalid or expired.");
+    }
+
+    const user = await ctx.db.get(record.user_id);
+    if (!user) {
+      throw new Error("User not found.");
+    }
+
+    await ctx.db.patch(record.user_id, {
+      email_verified: true,
+      verification_token: undefined,
+      verification_token_expires: undefined,
+    });
+
+    await ctx.db.delete(record._id);
+
+    return { success: true };
+  },
+});
+
+export const login = mutation({
   args: {
     email: v.string(),
-    password: v.optional(v.string()),
+    password: v.string(),
   },
   handler: async (ctx, args) => {
     const email = normalizeEmail(args.email);
@@ -63,72 +137,81 @@ export const signIn = mutation({
       .withIndex("by_email", (q) => q.eq("email", email))
       .unique();
 
-    if (!user) {
-      throw new Error("No account found for this email.");
+    if (!user || !user.password) {
+      throw new Error("Invalid email or password.");
     }
 
-    if (user.password && args.password) {
-      // Support both bcrypt hashes and legacy plain-text passwords
-      const isValid = bcrypt.compareSync(args.password, user.password)
-        || user.password === args.password;
-      if (!isValid) {
-        throw new Error("Invalid password.");
-      }
+    const validPassword = await bcrypt.compare(args.password, user.password);
+    if (!validPassword) {
+      throw new Error("Invalid email or password.");
     }
+
+    const sessionToken = randomUUID();
+    const expiresAt = Date.now() + SESSION_TTL_MS;
+
+    await ctx.db.insert("sessions", {
+      token: sessionToken,
+      user_id: user._id,
+      expires_at: expiresAt,
+    });
 
     return {
-      userId: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      preferred_pudo_locker_id: user.preferred_pudo_locker_id,
-      pudo_locker_address: user.pudo_locker_address,
-      size_preferences: user.size_preferences,
-    };
-  },
-});
-
-export const magicLink = mutation({
-  args: {
-    email: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const email = normalizeEmail(args.email);
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", email))
-      .unique();
-
-    if (!user) {
-      throw new Error("No account found for this email.");
-    }
-
-    const token = `${Date.now().toString(36)}-${Math.random()
-      .toString(36)
-      .slice(2, 10)}`;
-    const expiresAt = Date.now() + 15 * 60 * 1000;
-
-    return {
-      email,
-      magicLink: `https://proe.app/login?email=${encodeURIComponent(email)}&token=${token}`,
+      success: true,
+      sessionToken,
       expiresAt,
-      message: "Magic link generated (mock for MVP).",
+      user: toPublicUser(user),
     };
   },
 });
 
-export const getUserByEmail = query({
+export const me = query({
   args: {
-    email: v.string(),
+    session_token: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const email = normalizeEmail(args.email);
-    return await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", email))
-      .unique();
+    if (!args.session_token) {
+      return null;
+    }
+
+    const session = await ctx.db
+      .query("sessions")
+      .withIndex("by_token", (q) => q.eq("token", args.session_token!))
+      .first();
+
+    if (!session || session.expires_at < Date.now()) {
+      return null;
+    }
+
+    const user = await ctx.db.get(session.user_id);
+    if (!user) {
+      return null;
+    }
+
+    return toPublicUser(user);
   },
 });
+
+export const logout = mutation({
+  args: {
+    session_token: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const session = await ctx.db
+      .query("sessions")
+      .withIndex("by_token", (q) => q.eq("token", args.session_token))
+      .first();
+
+    if (session) {
+      await ctx.db.delete(session._id);
+    }
+
+    return { success: true };
+  },
+});
+
+// Backwards compatible aliases while frontend pivots off social auth.
+export const signUp = register;
+export const signIn = login;
 
 export const updatePreferences = mutation({
   args: {
